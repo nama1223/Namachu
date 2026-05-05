@@ -1,0 +1,8 @@
+/* NamaChu — 設定タブ (additional overrides beyond base.css) */
+
+/* Theme button color swatches */
+.theme-btn[data-theme="default"] { background: #dccaaf; color: #4a3f35; }
+.theme-btn[data-theme="dark"]    { background: #2c2c2c; color: #e0e0e0; }
+.theme-btn[data-theme="light"]   { background: #f5f3cd; color: #333; }
+.theme-btn[data-theme="darkred"] { background: #3d1a1a; color: #fcdcdc; }
+.theme-btn[data-theme="navy"]    { background: #1a2d4a; color: #dbeafe; }

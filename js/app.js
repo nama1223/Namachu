@@ -1,0 +1,159 @@
+/* NamaChu — app entry point */
+
+import { initI18n, setLang, applyI18n, t } from './i18n.js';
+import { showToast, closeModal, openModal, getInstrument, lsSet } from './utils.js';
+import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold } from './audio.js';
+import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold } from './tuner.js';
+import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle } from './record.js';
+import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, onScaleInstrumentChange as _scaleInstChange } from './scale.js';
+import { initSettings, getSettings, onInstrumentChange, adjustConcertPitch, onNoteStyleChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold } from './settings.js';
+
+// ---- Tab management ----
+let _currentTab = 'tuner';
+
+function switchTab(name) {
+  _currentTab = name;
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name)?.classList.add('active');
+  document.getElementById('tabBtn-' + name)?.classList.add('active');
+}
+
+// ---- Mic toggle ----
+let _clarityThreshold = 0.85;
+let _minRms = 0.01;
+
+async function toggleMic() {
+  const btn = document.getElementById('micToggleBtn');
+  if (isMicRunning()) {
+    stopMic();
+    btn?.classList.remove('active');
+  } else {
+    try {
+      await startMic(onAudioFrame);
+      btn?.classList.add('active');
+    } catch (e) {
+      showToast(t('toast_mic_denied'));
+    }
+  }
+}
+
+// ---- Central audio callback ----
+function onAudioFrame(freq, clarity, rms) {
+  tunerOnPitch(freq, clarity, rms);
+  onRecordPitch(freq, clarity, _clarityThreshold);
+  onScalePitch(freq, clarity);
+}
+
+// ---- Settings change callback ----
+function onSettingsChange(s) {
+  const inst = getInstrument(s.instrumentId);
+  const cp = s.concertPitch;
+  const ns = s.noteStyle;
+  _clarityThreshold = clarityToThreshold(s.clarity);
+  _minRms = minVolumeToRms(s.minVolume);
+
+  setMinRms(_minRms);
+  setClarityThreshold(_clarityThreshold);
+
+  setTunerConcertPitch(cp);
+  setTunerNoteStyle(ns);
+  setTunerInstrument(inst);
+  setTunerClarityThreshold(_clarityThreshold);
+
+  setRecordConcertPitch(cp);
+  setRecordNoteStyle(ns);
+  setRecordInstrument(inst);
+
+  setScaleConcertPitch(cp);
+  setScaleNoteStyle(ns);
+  setScaleInstrument(inst);
+  setScaleClarityThreshold(_clarityThreshold);
+}
+
+// ---- Bootstrap ----
+function init() {
+  // Language
+  const savedLang = localStorage.getItem('namaChu_lang') || (navigator.language.startsWith('ja') ? 'ja' : 'en');
+  initI18n(savedLang);
+
+  // Settings (must come before other inits so instrument etc. are ready)
+  initSettings(onSettingsChange);
+  const s = getSettings();
+  const inst = getInstrument(s.instrumentId);
+
+  // Sub-module init
+  initTuner({
+    concertPitch: s.concertPitch,
+    noteStyle: s.noteStyle,
+    instrument: inst,
+    clarityThreshold: clarityToThreshold(s.clarity),
+  });
+
+  initRecord({
+    instrument: inst,
+    concertPitch: s.concertPitch,
+    noteStyle: s.noteStyle,
+  });
+
+  initScale({
+    instrument: inst,
+    concertPitch: s.concertPitch,
+    noteStyle: s.noteStyle,
+    clarityThreshold: clarityToThreshold(s.clarity),
+  });
+
+  // Apply i18n again after all elements rendered
+  applyI18n();
+
+  // Expose globals for inline HTML onclick handlers
+  exposeGlobals();
+}
+
+function exposeGlobals() {
+  const g = window;
+  g.switchTab = switchTab;
+  g.toggleMic = toggleMic;
+  g.setLang = (lang) => { setLang(lang); applyI18n(); };
+
+  // Settings tab
+  g.onInstrumentChange = onInstrumentChange;
+  g.adjustConcertPitch = adjustConcertPitch;
+  g.onNoteStyleChange = onNoteStyleChange;
+  g.onMinVolumeChange = onMinVolumeChange;
+  g.onClarityChange = onClarityChange;
+  g.exportAllData = exportAllData;
+  g.importData = importData;
+  g.clearAllData = clearAllData;
+  g.applyThemeUI = applyThemeUI;
+
+  // Record tab
+  g.toggleRecording = toggleRecording;
+  g.togglePlayback = togglePlayback;
+  g.clearRecording = clearRecording;
+  g.saveRecording = saveRecording;
+  g.confirmSaveRecording = confirmSaveRecording;
+  g.showRecordList = showRecordList;
+  g.hideRecordList = hideRecordList;
+  g.loadRecording = loadRecording;
+  g.deleteRecording = deleteRecording;
+
+  // Scale tab
+  g.toggleScaleMeasure = toggleScaleMeasure;
+  g.clearScaleData = clearScaleData;
+  g.exportScaleData = exportScaleData;
+  g.deleteDataset = deleteDataset;
+  g.onScaleInstrumentChange = () => {
+    const sel = document.getElementById('scaleMeasureInstrument');
+    if (sel) {
+      document.getElementById('instrumentSelect').value = sel.value;
+      onInstrumentChange();
+    }
+  };
+  g.showScaleHelp = () => openModal('scaleHelpModal');
+
+  // Modal helpers
+  g.closeModal = closeModal;
+}
+
+document.addEventListener('DOMContentLoaded', init);

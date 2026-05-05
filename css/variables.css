@@ -1,0 +1,85 @@
+/* NamaChu — CSS custom properties (themes) */
+:root {
+  --bg-color: #dccaaf;
+  --surface-color: #fdf8f5;
+  --text-color: #4a3f35;
+  --primary-color: #c47640;
+  --secondary-color: #e5b985;
+  --dot-bg: #e6d5c3;
+  --dot-weak: #bda692;
+  --flash-color: #ffffff;
+  --active-border: var(--text-color);
+  --highlight-color: #d94a38;
+  --bubble-color: #4a7c8e;
+  --in-tune-color: #4caf50;
+  --sharp-color: #e53935;
+  --flat-color: #1e88e5;
+}
+
+[data-theme="dark"] {
+  --bg-color: #121212;
+  --surface-color: #2c2c2c;
+  --text-color: #e0e0e0;
+  --primary-color: #bb86fc;
+  --secondary-color: #03dac6;
+  --dot-bg: #444;
+  --dot-weak: #777;
+  --flash-color: #444444;
+  --active-border: #ffffff;
+  --highlight-color: #ff80ab;
+  --bubble-color: #4caf72;
+  --in-tune-color: #66bb6a;
+  --sharp-color: #ef5350;
+  --flat-color: #42a5f5;
+}
+
+[data-theme="light"] {
+  --bg-color: #f5f3cd;
+  --surface-color: #faf9e8;
+  --text-color: #333333;
+  --primary-color: #c07838;
+  --secondary-color: #d4a855;
+  --dot-bg: #d8d496;
+  --dot-weak: #b3c558;
+  --flash-color: #000000;
+  --active-border: var(--primary-color);
+  --highlight-color: #d94a38;
+  --bubble-color: #4a7c8e;
+  --in-tune-color: #388e3c;
+  --sharp-color: #c62828;
+  --flat-color: #1565c0;
+}
+
+[data-theme="darkred"] {
+  --bg-color: #2b0f0f;
+  --surface-color: #3d1a1a;
+  --text-color: #fcdcdc;
+  --primary-color: #e62e2e;
+  --secondary-color: #ff9999;
+  --dot-bg: #4d2626;
+  --dot-weak: #8a4848;
+  --flash-color: #5c2020;
+  --active-border: #ffffff;
+  --highlight-color: #ffeb3b;
+  --bubble-color: #2e9944;
+  --in-tune-color: #66bb6a;
+  --sharp-color: #ff6f00;
+  --flat-color: #7986cb;
+}
+
+[data-theme="navy"] {
+  --bg-color: #0d1b35;
+  --surface-color: #1a2d4a;
+  --text-color: #dbeafe;
+  --primary-color: #2563eb;
+  --secondary-color: #93c5fd;
+  --dot-bg: #1e3a5f;
+  --dot-weak: #2e5282;
+  --flash-color: #1a3a6b;
+  --active-border: #93c5fd;
+  --highlight-color: #f59e0b;
+  --bubble-color: #e67e22;
+  --in-tune-color: #4caf50;
+  --sharp-color: #ef5350;
+  --flat-color: #42a5f5;
+}

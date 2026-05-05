@@ -1,0 +1,186 @@
+/* NamaChu — 記録タブ */
+
+.record-header-btns {
+  display: flex;
+  gap: 6px;
+}
+
+/* ---- カラオケ式キャンバス ---- */
+.record-view-wrapper {
+  position: relative;
+  display: flex;
+  gap: 0;
+  height: 240px;
+  margin-bottom: 8px;
+  background: var(--bg-color);
+  border: 1px solid var(--dot-weak);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.record-canvas {
+  flex: 1;
+  display: block;
+  height: 100%;
+}
+
+.record-pitch-axis {
+  width: 36px;
+  flex-shrink: 0;
+  background: var(--dot-bg);
+  border-left: 1px solid var(--dot-weak);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 4px 2px;
+  font-size: 0.58rem;
+  font-weight: bold;
+  text-align: center;
+  overflow: hidden;
+}
+
+/* ---- 時間バー ---- */
+.record-time-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 0.82rem;
+}
+.record-progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--dot-bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.record-progress-fill {
+  height: 100%;
+  background: var(--primary-color);
+  border-radius: 3px;
+  width: 0%;
+  transition: width 0.1s;
+}
+
+/* ---- コントロールボタン ---- */
+.record-controls {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  height: 60px;
+}
+
+.rec-btn {
+  flex: 1;
+  background: var(--highlight-color);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: 0.15s;
+}
+.rec-btn.recording {
+  background: #333;
+  animation: recBlink 1s infinite;
+}
+@keyframes recBlink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217,74,56,0.6); }
+  50% { box-shadow: 0 0 0 6px rgba(217,74,56,0); }
+}
+
+.play-btn {
+  flex: 1;
+  background: var(--secondary-color);
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.play-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.play-btn.playing {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+.clear-btn {
+  width: 50px;
+  background: var(--dot-bg);
+  color: var(--text-color);
+  border: 1px solid var(--dot-weak);
+  border-radius: 12px;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+/* ---- 保存リストモーダル ---- */
+.record-list-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  z-index: 2000;
+  align-items: flex-end;
+  justify-content: center;
+}
+.record-list-overlay.active { display: flex; }
+.record-list-modal {
+  background: var(--surface-color);
+  border-radius: 16px 16px 0 0;
+  padding: 20px;
+  width: 100%;
+  max-width: 450px;
+  max-height: 70vh;
+  overflow-y: auto;
+  color: var(--text-color);
+}
+.record-list-modal h3 { margin: 0 0 12px; }
+.record-list-modal button {
+  margin-top: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--dot-weak);
+  border-radius: 8px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-weight: bold;
+}
+
+.record-item {
+  display: flex;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--dot-weak);
+  gap: 8px;
+}
+.record-item-name { flex: 1; font-weight: bold; font-size: 0.9rem; }
+.record-item-date { font-size: 0.75rem; opacity: 0.6; }
+.record-item-load {
+  padding: 4px 12px;
+  border-radius: 6px;
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+.record-item-del {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--highlight-color);
+  border: 1px solid var(--highlight-color);
+  font-size: 0.8rem;
+}

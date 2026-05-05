@@ -1,0 +1,174 @@
+/* NamaChu — 音階測定タブ */
+
+.scale-instrument-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.scale-instrument-row label {
+  font-weight: bold;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.scale-instrument-row select { flex: 1; }
+
+/* ---- チューニングセクション ---- */
+.scale-tuning-section {
+  background: var(--bg-color);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 10px;
+  border: 1px solid var(--dot-weak);
+}
+.scale-hint {
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin: 0 0 8px;
+  line-height: 1.4;
+}
+.scale-tuning-meter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.scale-ref-note {
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: var(--primary-color);
+}
+.scale-tuning-cents {
+  font-size: 1.1rem;
+  font-weight: bold;
+}
+
+/* ---- コントロール ---- */
+.scale-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.scale-start-btn {
+  flex: 1;
+  padding: 12px;
+  background: var(--primary-color);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: bold;
+}
+.scale-start-btn.measuring {
+  background: var(--highlight-color);
+}
+.scale-clear-btn {
+  padding: 12px 20px;
+  background: var(--dot-bg);
+  border: 1px solid var(--dot-weak);
+  border-radius: 10px;
+  color: var(--text-color);
+  font-weight: bold;
+}
+
+/* ---- 現在測定中 ---- */
+.scale-current {
+  background: var(--bg-color);
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--primary-color);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.scale-current-note {
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: var(--primary-color);
+  min-width: 40px;
+}
+.scale-shot-dots {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+.shot-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--dot-weak);
+  background: transparent;
+  transition: 0.2s;
+}
+.shot-dot.filled {
+  background: var(--in-tune-color);
+  border-color: var(--in-tune-color);
+}
+.scale-current-cents {
+  font-size: 1rem;
+  font-weight: bold;
+  min-width: 50px;
+  text-align: right;
+}
+
+/* ---- グラフ ---- */
+.scale-chart-wrapper {
+  background: var(--bg-color);
+  border: 1px solid var(--dot-weak);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+.scale-chart {
+  width: 100%;
+  display: block;
+  height: 200px;
+}
+
+/* ---- 比較セクション ---- */
+.scale-compare-section {
+  background: var(--bg-color);
+  border-radius: 10px;
+  border: 1px solid var(--dot-weak);
+  padding: 10px 14px;
+}
+.scale-compare-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: bold;
+  font-size: 0.9rem;
+}
+.scale-export-btn {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--dot-weak);
+  background: var(--surface-color);
+  color: var(--text-color);
+  font-size: 0.8rem;
+  font-weight: bold;
+}
+
+.scale-data-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--dot-weak);
+  font-size: 0.85rem;
+}
+.scale-data-color {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.scale-data-name { flex: 1; font-weight: bold; }
+.scale-data-del {
+  background: transparent;
+  border: none;
+  color: var(--highlight-color);
+  font-size: 1rem;
+  padding: 0 4px;
+}

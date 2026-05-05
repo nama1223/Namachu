@@ -1,0 +1,168 @@
+/* NamaChu — チューナータブ */
+
+/* ---- マイクボタン ---- */
+.mic-btn {
+  background: var(--primary-color);
+  border: none;
+  border-radius: 50%;
+  width: 42px;
+  height: 42px;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  transition: background 0.2s, transform 0.1s;
+}
+.mic-btn.active {
+  background: var(--highlight-color);
+  animation: micPulse 1.5s ease-in-out infinite;
+}
+.mic-btn:active { transform: scale(0.93); }
+
+@keyframes micPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(217, 74, 56, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(217, 74, 56, 0); }
+}
+
+/* ---- 上半分: アナログメーター ---- */
+.tuner-upper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--dot-weak);
+}
+
+.meter-wrapper {
+  width: 100%;
+  position: relative;
+}
+
+.meter-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* SVG 要素 */
+.meter-arc {
+  stroke: var(--dot-weak);
+}
+.meter-ticks line {
+  stroke: var(--text-color);
+  opacity: 0.5;
+}
+.meter-ticks line.major {
+  opacity: 1;
+  stroke-width: 2;
+}
+.meter-ticks line.center {
+  stroke: var(--in-tune-color);
+  opacity: 1;
+  stroke-width: 3;
+}
+.meter-needle {
+  stroke: var(--highlight-color);
+  stroke-width: 3;
+  stroke-linecap: round;
+  transform-origin: 150px 150px;
+  transition: transform 0.08s ease-out;
+}
+.meter-needle.in-tune {
+  stroke: var(--in-tune-color);
+}
+.meter-pivot {
+  fill: var(--text-color);
+}
+
+.meter-labels {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 10px;
+  font-size: 0.7rem;
+  opacity: 0.6;
+  margin-top: -8px;
+}
+
+/* ---- 音名表示 ---- */
+.note-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 80px;
+}
+.note-name {
+  font-size: 3rem;
+  font-weight: 900;
+  color: var(--primary-color);
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.note-octave {
+  font-size: 1.2rem;
+  font-weight: bold;
+  opacity: 0.6;
+  margin-top: -6px;
+}
+.note-cents {
+  font-size: 1.1rem;
+  font-weight: bold;
+  color: var(--text-color);
+}
+.note-cents.sharp { color: var(--sharp-color); }
+.note-cents.flat  { color: var(--flat-color); }
+.note-cents.in-tune { color: var(--in-tune-color); }
+.note-freq {
+  font-size: 0.85rem;
+  opacity: 0.6;
+}
+
+/* ---- 下半分: 時間軸グラフ ---- */
+.tuner-lower {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  margin-top: 10px;
+  height: 110px;
+}
+.time-graph {
+  flex: 1;
+  border-radius: 8px;
+  background: var(--bg-color);
+  border: 1px solid var(--dot-weak);
+  display: block;
+  height: 100%;
+}
+.time-graph-labels {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  opacity: 0.55;
+  padding: 4px 0;
+  text-align: right;
+  min-width: 28px;
+}
+
+/* ---- フッター ---- */
+.tuner-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  font-size: 0.78rem;
+}
+.instrument-badge {
+  background: var(--dot-bg);
+  border-radius: 6px;
+  padding: 3px 10px;
+  font-weight: bold;
+  cursor: pointer;
+  opacity: 0.8;
+}
+.concert-pitch-badge {
+  opacity: 0.6;
+}
