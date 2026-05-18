@@ -179,6 +179,10 @@
       <div class="scale-current-cents" id="scaleCurrentCents">-- ¢</div>
     </div>
 
+    <div class="scale-view-tabs">
+      <button class="scale-view-tab active" data-view="graph" onclick="switchScaleView('graph')" data-i18n="tab_scale_graph">グラフ</button>
+      <button class="scale-view-tab" data-view="list" onclick="switchScaleView('list')" data-i18n="tab_scale_list">リスト</button>
+    </div>
     <div class="scale-chart-wrapper">
       <canvas class="scale-chart" id="scaleChart"></canvas>
     </div>

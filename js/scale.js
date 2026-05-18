@@ -29,10 +29,21 @@ let currentResults = {};
 let savedDatasets = [];
 const COLORS = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1'];
 
-// 音名ごとの色 (6色 × 2 = 12半音をカバー。C/F#=赤, C#/G=橙, D/G#=黄, D#/A=緑, E/A#=青, F/B=紫)
-const NOTE_COLORS_6 = ['#e53935','#fb8c00','#f9a825','#43a047','#1e88e5','#7b1fa2'];
+// 音名ごとの色 (6色 × 2 = 12半音をカバー。C/F#=赤, C#/G=橙, D/G#=緑, D#/A=黄, E/A#=青, F/B=紫)
+const NOTE_COLORS_6 = ['#e53935','#fb8c00','#43a047','#f9a825','#1e88e5','#7b1fa2'];
 function _noteColor(midi) {
   return NOTE_COLORS_6[((Math.round(midi) % 12) + 12) % 12 % 6];
+}
+
+// グラフ/リスト表示切り替え
+let _scaleViewMode = 'graph'; // 'graph' | 'list'
+
+export function switchScaleView(mode) {
+  _scaleViewMode = mode;
+  document.querySelectorAll('.scale-view-tab').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === mode);
+  });
+  renderChart();
 }
 
 // ポップアップ
@@ -495,8 +506,14 @@ function _drawMiniTuner() {
   }
 }
 
-// ---- Chart ----
+// ---- Chart dispatcher ----
 function renderChart() {
+  if (_scaleViewMode === 'list') _renderList();
+  else _renderGraph();
+}
+
+// ---- Graph view ----
+function _renderGraph() {
   if (!chartCtx || !chartCanvas || !_instrument) return;
   const dpr = devicePixelRatio;
   const w = chartCanvas.offsetWidth * dpr;
@@ -628,4 +645,140 @@ function drawDataset(ctx, results, color, loMidi, hiMidi, colW, midY, YMAX, padL
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
+}
+
+// ---- List view ----
+function _renderList() {
+  if (!chartCtx || !chartCanvas || !_instrument) return;
+  const dpr = devicePixelRatio;
+  const w = chartCanvas.offsetWidth * dpr;
+  const h = chartCanvas.offsetHeight * dpr;
+  chartCanvas.width = w;
+  chartCanvas.height = h;
+  const ctx = chartCtx;
+  const style = getComputedStyle(document.documentElement);
+
+  const bgColor   = style.getPropertyValue('--bg-color').trim()        || '#fff';
+  const textColor = style.getPropertyValue('--text-color').trim()       || '#333';
+  const dotWeak   = style.getPropertyValue('--dot-weak').trim()         || '#ccc';
+  const inTuneCol = style.getPropertyValue('--in-tune-color').trim()    || '#4caf50';
+  const sharpCol  = style.getPropertyValue('--sharp-color').trim()      || '#e53935';
+  const flatCol   = style.getPropertyValue('--flat-color').trim()       || '#1e88e5';
+
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, w, h);
+
+  const loMidi = _instrument.loMidi;
+  const hiMidi = _instrument.hiMidi;
+  // MIDI octave: C4=60 → octave = floor(midi/12)-1
+  const loOct = Math.floor(loMidi / 12) - 1;
+  const hiOct = Math.floor(hiMidi / 12) - 1;
+  const octCount = hiOct - loOct + 1;
+
+  const ROW_COUNT = 12;
+  const padL = 4 * dpr, padR = 4 * dpr, padT = 18 * dpr, padB = 4 * dpr;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+  const colW  = plotW / octCount;
+  const rowH  = plotH / ROW_COUNT;
+  // 行の高さに合わせてフォントサイズを決める（最大11dpr, 最小7dpr）
+  const fontSize = clamp(rowH * 0.38, 7 * dpr, 11 * dpr);
+  const BLACK_SET = new Set([1, 3, 6, 8, 10]);
+
+  // オクターブ列ヘッダー（例: C4 の "4"）
+  ctx.font = `bold ${clamp(fontSize * 0.9, 7 * dpr, 10 * dpr)}px sans-serif`;
+  ctx.textAlign = 'center';
+  for (let oct = loOct; oct <= hiOct; oct++) {
+    const x = padL + (oct - loOct + 0.5) * colW;
+    ctx.fillStyle = textColor;
+    ctx.globalAlpha = 0.55;
+    ctx.fillText(`C${oct}`, x, padT - 4 * dpr);
+  }
+  ctx.globalAlpha = 1;
+
+  // 縦区切り線
+  ctx.strokeStyle = dotWeak;
+  ctx.lineWidth = 1 * dpr;
+  ctx.globalAlpha = 0.35;
+  for (let i = 0; i <= octCount; i++) {
+    const x = padL + i * colW;
+    ctx.beginPath();
+    ctx.moveTo(x, padT - 16 * dpr);
+    ctx.lineTo(x, h - padB);
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  // 各行（半音）を描画
+  for (let row = 0; row < ROW_COUNT; row++) {
+    const semitone = row; // 0=C … 11=B (下へいくほど高い音)
+    const isBlack = BLACK_SET.has(semitone);
+    const ry = padT + row * rowH;
+
+    // 黒鍵行の背景を薄く着色
+    if (isBlack) {
+      ctx.fillStyle = dotWeak;
+      ctx.globalAlpha = 0.1;
+      ctx.fillRect(padL, ry, plotW, rowH);
+      ctx.globalAlpha = 1;
+    }
+
+    // 行区切り線
+    ctx.strokeStyle = dotWeak;
+    ctx.lineWidth = 0.5 * dpr;
+    ctx.globalAlpha = 0.35;
+    ctx.beginPath();
+    ctx.moveTo(padL, ry);
+    ctx.lineTo(w - padR, ry);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // 各列（オクターブ）
+    for (let oct = loOct; oct <= hiOct; oct++) {
+      const midi = (oct + 1) * 12 + semitone;
+      if (midi < loMidi || midi > hiMidi) continue;
+
+      const cx = padL + (oct - loOct) * colW;
+      const noteColor = _noteColor(midi);
+      const info = midiToNoteInfo(midi);
+      // C は "C4" 形式、それ以外は音名のみ
+      const label = noteName(info.note, info.octave, _noteStyle, semitone === 0);
+
+      // 音名
+      ctx.font = `${isBlack ? '' : 'bold '}${fontSize}px sans-serif`;
+      ctx.textAlign = 'left';
+      ctx.fillStyle = noteColor;
+      ctx.globalAlpha = isBlack ? 0.75 : 0.9;
+      ctx.fillText(label, cx + 3 * dpr, ry + rowH * 0.62);
+      ctx.globalAlpha = 1;
+
+      // cents 値（現在測定＋保存データセット）
+      const allVals = [];
+      if (currentResults[midi]) {
+        allVals.push({ cents: currentResults[midi].avg, isCurrent: true });
+      }
+      savedDatasets.forEach(ds => {
+        const v = ds.results[midi];
+        if (v !== undefined) {
+          allVals.push({ cents: Math.round(typeof v === 'object' ? v.avg : v), isCurrent: false, dsColor: ds.color });
+        }
+      });
+
+      if (allVals.length > 0) {
+        const vFontSize = clamp(fontSize * (allVals.length > 1 ? 0.72 : 0.88), 6 * dpr, 10 * dpr);
+        ctx.font = `bold ${vFontSize}px sans-serif`;
+        ctx.textAlign = 'right';
+        const rightX = cx + colW - 3 * dpr;
+        allVals.forEach((v, vi) => {
+          const sign = v.cents >= 0 ? '+' : '';
+          ctx.fillStyle = Math.abs(v.cents) <= 5 ? inTuneCol : v.cents > 0 ? sharpCol : flatCol;
+          // 複数ある場合は上下に分割配置
+          const fracY = allVals.length === 1
+            ? 0.62
+            : 0.28 + vi * (0.65 / (allVals.length - 1));
+          ctx.fillText(`${sign}${v.cents}`, rightX, ry + rowH * fracY);
+        });
+      }
+    }
+  }
 }

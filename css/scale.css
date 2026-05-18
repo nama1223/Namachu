@@ -97,6 +97,31 @@
   text-align: right;
 }
 
+/* ---- グラフ/リスト 表示切り替えタブ ---- */
+.scale-view-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.scale-view-tab {
+  flex: 1;
+  padding: 6px 0;
+  border: 1px solid var(--dot-weak);
+  border-radius: 8px;
+  background: var(--bg-color);
+  color: var(--text-color);
+  font-size: 0.82rem;
+  font-weight: bold;
+  opacity: 0.55;
+  transition: 0.15s;
+}
+.scale-view-tab.active {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+  opacity: 1;
+}
+
 /* ---- グラフ ---- */
 .scale-chart-wrapper {
   background: var(--bg-color);
