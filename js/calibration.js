@@ -14,8 +14,10 @@ const RECORD_SECONDS = 10;
 const FRAME_INTERVAL_MS = 1000 / 60; // 60fps想定
 
 // グリッド（スライダー値）
-const MIN_VOLUME_GRID = [3, 6, 10, 15, 22, 30];
-const CLARITY_GRID    = [55, 65, 72, 80, 86, 92];
+const MIN_VOLUME_GRID  = [2, 5, 10, 15, 22, 30];
+const CLARITY_GRID     = [40, 55, 65, 75, 85, 92];
+// 無音猶予[ms]: 短いドロップアウトをこの時間まで「持続音」とみなす
+const SILENCE_GRACE_GRID = [40, 100, 160, 240];
 
 let _state = 'idle'; // idle | countdown | recording | analyzing | done
 let _frames = [];    // [{ buf: Float32Array, rms: number, tMs: number }]
@@ -107,15 +109,16 @@ function _renderDone(best) {
       issues.push(`<b>検出ノートが${best.noteCount}/8</b>: 同じ音内で揺れが大きく別の音に分割されている可能性。ロングトーンを安定させて再演奏してください。`);
     }
     if (best.flips > 0) issues.push(`<b>裏返り${best.flips}回</b>: マイクが倍音を一瞬拾っています。もう少しマイクから離れる／向きを調整すると改善することがあります。`);
-    if (best.gaps > 0) issues.push(`<b>途切れ${best.gaps}回</b>: 連続した音の中に弱くなる瞬間があります。息のコントロールやマイク位置を確認してください。`);
+    if (best.gaps > 0) issues.push(`<b>途切れ${best.gaps}回</b>: 連続音の中にピッチ検出失敗があります。${best.silenceGrace >= 160 ? '無音猶予を最大に設定したので、録音側ではある程度補正されます。' : '息のコントロールやマイク位置を確認してください。'}`);
+    if (best.silenceGrace >= 160) issues.push(`スマホ等で発生しやすい短時間ドロップアウト対策として<b>無音猶予 ${best.silenceGrace}ms</b> を適用しています。`);
     if (isPerfect) issues.push('✓ 完璧に検出できました。');
   }
 
   const summaryHTML = `
     <div class="calib-result">
-      <div style="font-size:0.78rem;opacity:0.7;margin-bottom:4px;">※ 数値は36通りのパラメータ組合せで最良だったものです</div>
+      <div style="font-size:0.78rem;opacity:0.7;margin-bottom:4px;">※ 数値は ${MIN_VOLUME_GRID.length * CLARITY_GRID.length * SILENCE_GRACE_GRID.length} 通りのパラメータ組合せで最良だったものです</div>
       <div>検出ノート数: <b>${best.noteCount}</b> / 8　裏返り: <b>${best.flips}</b> 回　途切れ: <b>${best.gaps}</b> 箇所</div>
-      <div style="margin-top:6px;">推奨設定 → 最小音量: <b>${best.minVolume}</b>　クラリティ: <b>${best.clarity}</b></div>
+      <div style="margin-top:6px;">推奨設定 → 最小音量: <b>${best.minVolume}</b>　クラリティ: <b>${best.clarity}</b>　無音猶予: <b>${best.silenceGrace}</b>ms</div>
       <canvas id="calibTraceCanvas" class="calib-trace" width="600" height="80"></canvas>
       <div class="calib-issues">${issues.map(s => `<div>・${s}</div>`).join('')}</div>
     </div>`;
@@ -338,23 +341,31 @@ function _analyzeAll() {
   // フレーム毎の YIN 結果をキャッシュ（minRms に依存しないので一度だけ）
   const yinResults = _frames.map(f => yinDetect(f.buf, sampleRate));
 
+  // 全フレームの時間間隔（ms）= 想定 16.7ms / 60fps
+  const frameMs = _frames.length >= 2
+    ? (_frames[_frames.length - 1].tMs - _frames[0].tMs) / (_frames.length - 1)
+    : 16.7;
+
   let best = null;
   for (const minVol of MIN_VOLUME_GRID) {
     const minRms = minVol / 100 * 0.15;
     for (const clar of CLARITY_GRID) {
       const clarThr = clar / 100;
-      const seq = _buildSequence(yinResults, minRms, clarThr);
-      const score = _scoreSequence(seq);
-      if (!best || score.score > best.score) {
-        best = { ...score, minVolume: minVol, clarity: clar };
+      for (const graceMs of SILENCE_GRACE_GRID) {
+        const graceFrames = Math.round(graceMs / frameMs);
+        const seq = _buildSequence(yinResults, minRms, clarThr, graceFrames);
+        const score = _scoreSequence(seq);
+        if (!best || score.score > best.score) {
+          best = { ...score, minVolume: minVol, clarity: clar, silenceGrace: graceMs };
+        }
       }
     }
   }
   return best;
 }
 
-// 各フレームに pitch を割り当て（最小音量 & クラリティ閾値で無音化）
-function _buildSequence(yinResults, minRms, clarThr) {
+// 各フレームに pitch を割り当て、その後 graceFrames 分の短い null を補間で埋める
+function _buildSequence(yinResults, minRms, clarThr, graceFrames) {
   const seq = [];
   for (let i = 0; i < _frames.length; i++) {
     const f = _frames[i];
@@ -362,6 +373,28 @@ function _buildSequence(yinResults, minRms, clarThr) {
     const r = yinResults[i];
     if (!r.freq || r.clarity < clarThr) { seq.push(null); continue; }
     seq.push(r.freq);
+  }
+  // 猶予内かつ前後ピッチが近い場合のみ「線形補間（対数空間）」で穴を埋める
+  if (graceFrames > 0) {
+    let i = 0;
+    while (i < seq.length) {
+      if (seq[i] !== null) { i++; continue; }
+      let j = i;
+      while (j < seq.length && seq[j] === null) j++;
+      const gapLen = j - i;
+      const prev = i > 0 ? seq[i - 1] : null;
+      const next = j < seq.length ? seq[j] : null;
+      if (prev !== null && next !== null && gapLen <= graceFrames) {
+        const semis = Math.abs(12 * Math.log2(next / prev));
+        if (semis < 1.5) {
+          for (let k = i; k < j; k++) {
+            const t = (k - i + 1) / (gapLen + 1);
+            seq[k] = prev * Math.pow(next / prev, t);
+          }
+        }
+      }
+      i = j;
+    }
   }
   return seq;
 }
@@ -477,7 +510,7 @@ function _scoreSequence(seq) {
 export function applyCalibration() {
   const best = window._calibBest;
   if (!best) return;
-  _onApply?.(best.minVolume, best.clarity);
+  _onApply?.(best.minVolume, best.clarity, best.silenceGrace);
   showToast('感度設定を適用しました');
   closeCalibration();
 }

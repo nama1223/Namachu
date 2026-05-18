@@ -14,6 +14,7 @@ const DEFAULTS = {
   theme: 'default',
   minVolume: 10,
   clarity: 85,
+  silenceGrace: 100, // ms; 持続音中のドロップアウトをこの時間まで許容
   collapsedCards: [],
 };
 
@@ -328,10 +329,13 @@ function _setSummary(id, text) {
 export function minVolumeToRms(v) { return v / 100 * 0.15; }
 export function clarityToThreshold(v) { return v / 100; }
 
+export function getSilenceGrace() { return _settings.silenceGrace ?? 100; }
+
 // ---- 自動校正からの設定適用 ----
-export function applyCalibratedSensitivity(minVolume, clarity) {
+export function applyCalibratedSensitivity(minVolume, clarity, silenceGrace) {
   _settings.minVolume = minVolume;
   _settings.clarity = clarity;
+  if (typeof silenceGrace === 'number') _settings.silenceGrace = silenceGrace;
   const mv = document.getElementById('minVolumeSlider');
   const cl = document.getElementById('claritySlider');
   if (mv) { mv.value = minVolume; document.getElementById('minVolumeVal').textContent = minVolume; }

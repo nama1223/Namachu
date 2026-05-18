@@ -14,6 +14,7 @@ const OCTAVE_CONFIRM_FRAMES = 4;   // 何フレーム連続でオクターヴず
 let _instrument = null;
 let _concertPitch = 440;
 let _noteStyle = 'abc';
+let _silenceGraceMs = 100; // 持続音中のドロップアウト許容時間
 
 let recording = false;
 let playing = false;
@@ -30,6 +31,7 @@ let _playbackTimer = null;
 // ---- Pitch sanity state ----
 let _freqEma = null;          // 周波数の指数移動平均（オクターヴ補正用）
 let _octaveShiftCount = 0;    // オクターヴずれが何フレーム連続したか
+let _silenceStartMs = null;   // 直前まで音があり無音に入った時刻（猶予判定用）
 
 // Canvas
 let canvas = null;
@@ -58,6 +60,7 @@ export function initRecord(opts = {}) {
 export function setRecordInstrument(inst) { _instrument = inst; buildPitchAxis(); }
 export function setRecordConcertPitch(hz) { _concertPitch = hz; }
 export function setRecordNoteStyle(s) { _noteStyle = s; buildPitchAxis(); }
+export function setRecordSilenceGrace(ms) { _silenceGraceMs = ms; }
 
 function resizeCanvas() {
   if (!canvas) return;
@@ -98,6 +101,7 @@ function startRecording() {
   _freqSamples = [];
   _freqEma = null;
   _octaveShiftCount = 0;
+  _silenceStartMs = null;
   document.getElementById('recBtn')?.classList.add('recording');
   document.getElementById('playBackBtn').disabled = true;
   updateTimeBar(0, 0);
@@ -171,11 +175,24 @@ export function onRecordPitch(freq, clarity, clarityThreshold) {
 
   // --- 無音判定 ---
   if (!freq || clarity < clarityThreshold) {
-    _freqEma = null;
-    _octaveShiftCount = 0;
-    if (_lastFreq !== null) finalizeCurrentEvent(now);
-    _lastFreq = null;
-    _freqSamples = [];
+    if (_lastFreq !== null) {
+      // 持続音中の無音 → 猶予で待機
+      if (_silenceStartMs === null) _silenceStartMs = timeMs;
+      const silentFor = timeMs - _silenceStartMs;
+      if (silentFor > _silenceGraceMs) {
+        // 猶予を超えた → 音符を確定
+        finalizeCurrentEvent(now);
+        _lastFreq = null;
+        _freqSamples = [];
+        _freqEma = null;
+        _octaveShiftCount = 0;
+        _silenceStartMs = null;
+      }
+      // 猶予中はサンプルを追加せず、音符は開いたまま
+    } else {
+      _freqEma = null;
+      _octaveShiftCount = 0;
+    }
     updateTimeBar(timeMs, timeMs);
     return;
   }
@@ -183,14 +200,28 @@ export function onRecordPitch(freq, clarity, clarityThreshold) {
   // --- オクターヴ誤検出フィルタ＆補正 ---
   const safeFreq = sanitizeFreq(freq);
   if (safeFreq === null) {
-    // このフレームは棄却（音符は継続扱い）
     updateTimeBar(timeMs, timeMs);
     return;
   }
 
+  // --- 猶予中の復帰チェック ---
+  if (_silenceStartMs !== null) {
+    if (_lastFreq !== null) {
+      // 直前の音と近いピッチなら同じ音として継続、遠ければ新規音として分離
+      const semis = Math.abs(12 * Math.log2(safeFreq / _lastFreq));
+      if (semis > 1.5) {
+        finalizeCurrentEvent(now);
+        _lastFreq = null;
+        _freqSamples = [];
+        _freqEma = null;
+        _octaveShiftCount = 0;
+      }
+    }
+    _silenceStartMs = null;
+  }
+
   // --- 有効サンプル処理 ---
   if (_lastFreq === null) {
-    // 無音後の新規音符開始
     _lastEventStart = timeMs;
     _freqSamples = [];
   }
