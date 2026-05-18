@@ -366,73 +366,107 @@ function _buildSequence(yinResults, minRms, clarThr) {
   return seq;
 }
 
-// シーケンスをスコア化:
-//   +ノート数（8 ちょうどで最大ボーナス）
-//   -オクターヴ跳躍（1フレーム単独の大ジャンプ）
-//   -連続音内の小さな穴（前後同じ pitch なのに null）
-//   +単調増加性
+// シーケンスをスコア化（プラトーベース）:
+//   ・freq を MIDI float に変換
+//   ・連続して ±0.7 半音以内に収まる区間をプラトー（音符）として検出
+//   ・短い null は「プラトー内の途切れ」としてカウント、長い null は休符として無視
+//   ・プラトー外への 1〜2 フレームの大ジャンプは裏返り
 function _scoreSequence(seq) {
-  // null を境界として「ノート」にグルーピング
-  const groups = [];
-  let cur = [];
-  for (let i = 0; i < seq.length; i++) {
-    const f = seq[i];
-    if (f === null) {
-      if (cur.length > 0) { groups.push(cur); cur = []; }
-    } else cur.push(f);
+  const PLATEAU_TOLERANCE = 0.7;        // 同じ音とみなす半音範囲
+  const MIN_PLATEAU_FRAMES = 4;          // プラトー最小持続
+  const MAX_INNER_GAP = 4;               // プラトー内で許容する null 連続
+  const FLIP_SEMIS = 5;                  // プラトー中心からこれ以上離れたら裏返り候補
+
+  // MIDI float 変換
+  const midis = seq.map(f => f ? 12 * Math.log2(f / 440) + 69 : null);
+
+  // プラトー検出
+  const plateaus = [];
+  let i = 0;
+  while (i < midis.length) {
+    if (midis[i] === null) { i++; continue; }
+    // i から始まるプラトー候補
+    const samples = [midis[i]];
+    let center = midis[i];
+    let lastValidIdx = i;
+    let j = i + 1;
+    while (j < midis.length) {
+      if (midis[j] === null) {
+        if (j - lastValidIdx > MAX_INNER_GAP) break;
+        j++;
+        continue;
+      }
+      if (Math.abs(midis[j] - center) > PLATEAU_TOLERANCE) {
+        // 中心から離れた → プラトー終了候補
+        // ただし 1〜2 フレームの単発ジャンプ（裏返り）は許容
+        let k = j + 1;
+        let returns = false;
+        while (k < midis.length && k - j < 3) {
+          if (midis[k] !== null && Math.abs(midis[k] - center) <= PLATEAU_TOLERANCE) {
+            returns = true; break;
+          }
+          k++;
+        }
+        if (returns) { j = k; continue; }
+        break;
+      }
+      samples.push(midis[j]);
+      // ゆっくり center を更新（揺らぎに追従）
+      center = center * 0.9 + midis[j] * 0.1;
+      lastValidIdx = j;
+      j++;
+    }
+    const endIdx = lastValidIdx + 1;
+    if (endIdx - i >= MIN_PLATEAU_FRAMES && samples.length >= 3) {
+      samples.sort((a, b) => a - b);
+      const med = samples[Math.floor(samples.length / 2)];
+      plateaus.push({ start: i, end: endIdx, center: med });
+    }
+    i = endIdx > i ? endIdx : i + 1;
   }
-  if (cur.length > 0) groups.push(cur);
 
-  // 最低 3 フレーム持続（≈ 50ms）以上のものだけ「ノート」と認める
-  const notes = groups.filter(g => g.length >= 3).map(g => {
-    g.sort((a, b) => a - b);
-    return g[Math.floor(g.length / 2)]; // 中央値
-  });
+  const notes = plateaus.map(p => p.center);
 
-  // 裏返り検出
+  // 裏返り: プラトー内で中心から FLIP_SEMIS 以上離れた点
   let flips = 0;
   const flipPositions = [];
-  for (let i = 1; i < seq.length - 2; i++) {
-    if (!seq[i - 1] || !seq[i] || !seq[i + 1]) continue;
-    const semisIn = Math.abs(12 * Math.log2(seq[i] / seq[i - 1]));
-    const semisBackTo1 = Math.abs(12 * Math.log2(seq[i + 1] / seq[i - 1]));
-    const semisBackTo2 = seq[i + 2] ? Math.abs(12 * Math.log2(seq[i + 2] / seq[i - 1])) : 99;
-    if (semisIn >= 6 && (semisBackTo1 <= 3 || semisBackTo2 <= 3)) {
-      flips++;
-      flipPositions.push(i);
+  for (const p of plateaus) {
+    for (let k = p.start; k < p.end; k++) {
+      if (midis[k] === null) continue;
+      if (Math.abs(midis[k] - p.center) >= FLIP_SEMIS) {
+        flips++;
+        flipPositions.push(k);
+      }
     }
   }
 
-  // 穴検出
+  // 途切れ: プラトー内の null フレーム（連続まとめて 1 箇所とカウント）
   let gaps = 0;
   const gapPositions = [];
-  for (let i = 1; i < seq.length - 1; i++) {
-    if (seq[i] !== null) continue;
-    let j = i;
-    while (j < seq.length && seq[j] === null) j++;
-    const gapLen = j - i;
-    if (gapLen > 3) { i = j; continue; }
-    const prev = seq[i - 1];
-    const next = seq[j];
-    if (prev && next) {
-      const semis = Math.abs(12 * Math.log2(next / prev));
-      if (semis <= 3) { gaps++; for (let k = i; k < j; k++) gapPositions.push(k); }
+  for (const p of plateaus) {
+    let inGap = false;
+    for (let k = p.start; k < p.end; k++) {
+      if (midis[k] === null) {
+        gapPositions.push(k);
+        if (!inGap) { gaps++; inGap = true; }
+      } else {
+        inGap = false;
+      }
     }
-    i = j;
   }
 
-  // 単調増加性
+  // 単調増加（半音以上上昇している割合）
   let ascending = 0;
   for (let i = 1; i < notes.length; i++) {
-    if (notes[i] > notes[i - 1] * 1.02) ascending++;
+    if (notes[i] >= notes[i - 1] + 0.5) ascending++;
   }
   const ascRatio = notes.length > 1 ? ascending / (notes.length - 1) : 0;
 
   // スコア合成
-  const noteCountScore = -Math.abs(notes.length - 8) * 30 + (notes.length >= 6 ? 50 : 0);
+  const noteCountScore = -Math.abs(notes.length - 8) * 35 + (notes.length === 8 ? 80 : notes.length >= 7 ? 40 : 0);
   const flipScore = -flips * 25;
-  const gapScore = -gaps * 8;
-  const ascScore = ascRatio * 60;
+  const gapScore = -gaps * 15;
+  const ascScore = ascRatio * 80;
   const total = noteCountScore + flipScore + gapScore + ascScore + 100;
 
   return { score: total, noteCount: notes.length, flips, gaps, seq, flipPositions, gapPositions };

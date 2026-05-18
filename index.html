@@ -16,6 +16,14 @@
     document.getElementById('pwaManifest').href = isJapanese ? 'manifest.json' : 'manifest-en.json';
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+      // 新しいSWが有効化されたら自動でリロード（初回登録時を除く）
+      let _reloading = false;
+      let _hadController = !!navigator.serviceWorker.controller;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (_reloading || !_hadController) return;
+        _reloading = true;
+        window.location.reload();
+      });
     }
   </script>
   <link rel="stylesheet" href="css/variables.css">

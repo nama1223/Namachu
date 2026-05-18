@@ -10,11 +10,12 @@ let _displayTrans = 0; // semitones: displayMidi = concertMidi - _displayTrans
 let _clarityThreshold = 0.85;
 let _fullColorEnabled = false;
 
-// Time-graph circular buffer
-const GRAPH_SECONDS = 10;
+// Time-graph circular buffer (2段表示用に 20 秒分)
+const GRAPH_SECONDS = 20;
 const GRAPH_FPS = 30;
 const GRAPH_POINTS = GRAPH_SECONDS * GRAPH_FPS;
-const graphBuf = new Array(GRAPH_POINTS).fill(null); // null | { cents, inTune }
+const POINTS_PER_ROW = GRAPH_POINTS / 2;
+const graphBuf = new Array(GRAPH_POINTS).fill(null); // null | { cents, inTune, name }
 let graphHead = 0;
 
 // Needle smoothing
@@ -60,7 +61,7 @@ function _clearFullColorBg() {
 // ---- Called each audio frame ----
 export function onPitch(freq, clarity, rms) {
   if (!freq || clarity < _clarityThreshold) {
-    pushGraph(null);
+    // 無音時はグラフを進めず一時停止（針と表示だけ更新）
     animateNeedleTo(0);
     setDisplaySilent();
     updateFullColorBg(null);
@@ -223,84 +224,108 @@ function drawGraph() {
   const h = graphCanvas.height;
   const ctx = graphCtx;
   const dpr = devicePixelRatio;
+  const bgStyle = getComputedStyle(document.documentElement);
 
   // Background
   ctx.clearRect(0, 0, w, h);
-  const bgStyle = getComputedStyle(document.documentElement);
   ctx.fillStyle = bgStyle.getPropertyValue('--bg-color').trim() || '#e6d5c3';
   ctx.fillRect(0, 0, w, h);
-
-  // Center line (0¢)
-  const midY = h / 2;
-  ctx.strokeStyle = bgStyle.getPropertyValue('--dot-weak').trim() || '#bda692';
-  ctx.lineWidth = 1 * dpr;
-  ctx.setLineDash([4 * dpr, 4 * dpr]);
-  ctx.beginPath();
-  ctx.moveTo(0, midY);
-  ctx.lineTo(w, midY);
-  ctx.stroke();
-  ctx.setLineDash([]);
-
-  // ±25¢ guide lines
-  ctx.globalAlpha = 0.3;
-  ctx.beginPath();
-  const y25p = midY - (h * 0.25);
-  const y25n = midY + (h * 0.25);
-  ctx.moveTo(0, y25p); ctx.lineTo(w, y25p);
-  ctx.moveTo(0, y25n); ctx.lineTo(w, y25n);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  // Pitch points (newest on right)
-  const total = Math.min(graphHead, GRAPH_POINTS);
-  const colW = w / GRAPH_POINTS;
 
   const inTuneCol = bgStyle.getPropertyValue('--in-tune-color').trim() || '#4caf50';
   const sharpCol  = bgStyle.getPropertyValue('--sharp-color').trim()  || '#e53935';
   const flatCol   = bgStyle.getPropertyValue('--flat-color').trim()   || '#1e88e5';
+  const dotWeak   = bgStyle.getPropertyValue('--dot-weak').trim()     || '#bda692';
   const textCol   = bgStyle.getPropertyValue('--text-color').trim()   || '#333';
 
-  // Note name labels on changes (top of graph)
-  let prevName = null;
+  const rowH = h / 2;
+  const colW = w / POINTS_PER_ROW;
+
+  // 行ごとの背景ガイド線
+  for (let row = 0; row < 2; row++) {
+    const yOffset = row * rowH;
+    const midY = yOffset + rowH / 2;
+
+    ctx.strokeStyle = dotWeak;
+    ctx.lineWidth = 1 * dpr;
+    ctx.setLineDash([4 * dpr, 4 * dpr]);
+    ctx.beginPath();
+    ctx.moveTo(0, midY); ctx.lineTo(w, midY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    ctx.moveTo(0, yOffset + rowH * 0.25); ctx.lineTo(w, yOffset + rowH * 0.25);
+    ctx.moveTo(0, yOffset + rowH * 0.75); ctx.lineTo(w, yOffset + rowH * 0.75);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
+  // 行の境界線
+  ctx.strokeStyle = dotWeak;
+  ctx.globalAlpha = 0.6;
+  ctx.lineWidth = 1 * dpr;
+  ctx.beginPath();
+  ctx.moveTo(0, rowH); ctx.lineTo(w, rowH);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  const total = Math.min(graphHead, GRAPH_POINTS);
+  if (total === 0) return;
+
+  // 位置計算ヘルパ: i (0..total-1, oldest..newest) → {row, xInRow}
+  // 上段=最新の POINTS_PER_ROW 個, 下段=その前の POINTS_PER_ROW 個
+  function posOf(i) {
+    const ageFromNewest = total - 1 - i;
+    if (ageFromNewest < POINTS_PER_ROW) {
+      return { row: 0, xInRow: POINTS_PER_ROW - 1 - ageFromNewest };
+    } else {
+      return { row: 1, xInRow: (2 * POINTS_PER_ROW - 1) - ageFromNewest };
+    }
+  }
+
+  // 音名ラベル（変化時）
   ctx.font = `bold ${11 * dpr}px sans-serif`;
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
+  let prevName = null;
   for (let i = 0; i < total; i++) {
     const idx = (graphHead - total + i + GRAPH_POINTS) % GRAPH_POINTS;
     const pt = graphBuf[idx];
     if (!pt || !pt.name) { prevName = null; continue; }
     if (pt.name !== prevName) {
-      const x = i * colW + colW / 2;
-      ctx.fillStyle = textCol;
-      ctx.globalAlpha = 0.8;
-      ctx.fillText(pt.name, x + 2 * dpr, 2 * dpr);
-      ctx.globalAlpha = 1;
-      // tiny vertical tick
+      const p = posOf(i);
+      const x = p.xInRow * colW + colW / 2;
+      const yTop = p.row * rowH;
+      // 縦の薄い区切り線
       ctx.strokeStyle = textCol;
       ctx.globalAlpha = 0.25;
       ctx.lineWidth = 1 * dpr;
       ctx.beginPath();
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, h);
+      ctx.moveTo(x, yTop); ctx.lineTo(x, yTop + rowH);
       ctx.stroke();
+      // 音名テキスト
+      ctx.fillStyle = textCol;
+      ctx.globalAlpha = 0.85;
+      ctx.fillText(pt.name, x + 2 * dpr, yTop + 2 * dpr);
       ctx.globalAlpha = 1;
       prevName = pt.name;
     }
   }
 
-  // Pitch dots
+  // ピッチ点
   for (let i = 0; i < total; i++) {
     const idx = (graphHead - total + i + GRAPH_POINTS) % GRAPH_POINTS;
     const pt = graphBuf[idx];
     if (!pt) continue;
-
-    const x = i * colW;
+    const p = posOf(i);
     const cents = Math.max(-50, Math.min(50, pt.cents));
-    const y = midY - (cents / 50) * (h / 2 - 4 * dpr);
-
+    const midY = p.row * rowH + rowH / 2;
+    const y = midY - (cents / 50) * (rowH / 2 - 4 * dpr);
+    const x = p.xInRow * colW + colW / 2;
     ctx.fillStyle = pt.inTune ? inTuneCol : (cents > 0 ? sharpCol : flatCol);
     ctx.beginPath();
-    ctx.arc(x + colW / 2, y, 3 * dpr, 0, Math.PI * 2);
+    ctx.arc(x, y, 3 * dpr, 0, Math.PI * 2);
     ctx.fill();
   }
 }

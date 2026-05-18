@@ -1,4 +1,6 @@
-const CACHE_NAME = 'namachu-cache-auto';
+// バージョンを上げると古いキャッシュが破棄される
+const VERSION = 'v4';
+const CACHE_NAME = `namachu-cache-${VERSION}`;
 
 const urlsToCache = [
   './index.html',
@@ -17,6 +19,7 @@ const urlsToCache = [
   './css/settings.css',
   './js/app.js',
   './js/audio.js',
+  './js/calibration.js',
   './js/i18n.js',
   './js/record.js',
   './js/scale.js',
@@ -25,7 +28,6 @@ const urlsToCache = [
   './js/utils.js',
 ];
 
-// インストール時: 必須ファイルをキャッシュし、即座に有効化
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
@@ -33,30 +35,26 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// 有効化時: 古いキャッシュを削除してすぐにクライアントを制御
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))
-      )
-    )
+      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+    ).then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
 
-// ネットワークファースト: オンライン時は最新版を取得してキャッシュ更新、オフライン時はキャッシュから返す
+// ネットワークファースト＋HTTPキャッシュバイパス。
+// オンライン時は常に最新を取得するため `cache: 'no-cache'`（条件付きGETで検証）を使用。
 self.addEventListener('fetch', (event) => {
   if (!event.request.url.startsWith('http')) return;
+  if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request)
+    fetch(event.request, { cache: 'no-cache' })
       .then((response) => {
-        if (response && response.status === 200) {
-          const responseToCache = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, responseToCache);
-          });
+        if (response && response.status === 200 && response.type === 'basic') {
+          const clone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
         }
         return response;
       })
