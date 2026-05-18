@@ -325,7 +325,7 @@ function drawGraph() {
     const x = p.xInRow * colW + colW / 2;
     ctx.fillStyle = pt.inTune ? inTuneCol : (cents > 0 ? sharpCol : flatCol);
     ctx.beginPath();
-    ctx.arc(x, y, 3 * dpr, 0, Math.PI * 2);
+    ctx.arc(x, y, 1.5 * dpr, 0, Math.PI * 2);
     ctx.fill();
   }
 }

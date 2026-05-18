@@ -382,7 +382,7 @@ function _drawMiniTuner() {
     }
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(x, y, 2 * dpr, 0, Math.PI * 2);
+    ctx.arc(x, y, 1 * dpr, 0, Math.PI * 2);
     ctx.fill();
 
     prevPt = { x, y, color };
@@ -445,7 +445,7 @@ function renderChart() {
   const colW = plotW / noteCount;
   const BLACK_SET = new Set([1, 3, 6, 8, 10]);
   const NATURAL_PRI = [0, 7, 4, 9, 2, 5, 11]; // C G E A D F B の優先度
-  const minGap = 15 * dpr;
+  const minGap = 8 * dpr;
   const usedBelow = [];
   const usedAbove = [];
 
