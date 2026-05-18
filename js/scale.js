@@ -62,7 +62,7 @@ export function setScaleInstrument(inst) { _instrument = inst; renderChart(); }
 export function setScaleConcertPitch(hz) { _concertPitch = hz; }
 export function setScaleNoteStyle(s) { _noteStyle = s; }
 export function setScaleClarityThreshold(v) { _clarityThreshold = v; }
-export function onScaleInstrumentChange() {}
+// onScaleInstrumentChange は settings.js で定義・app.js でグローバル登録
 
 // ---- Measure control ----
 export function toggleScaleMeasure() {

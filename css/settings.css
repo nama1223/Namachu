@@ -1,5 +1,16 @@
 /* NamaChu — 設定タブ (additional overrides beyond base.css) */
 
+/* ---- 楽器2カラム選択 (設定タブ・音階タブ共通) ---- */
+.instrument-dual-select {
+  display: flex;
+  gap: 6px;
+  flex: 1;
+}
+.instrument-dual-select select {
+  flex: 1;
+  min-width: 0; /* flex子要素が縮めるように */
+}
+
 /* Theme button color swatches */
 .theme-btn[data-theme="default"] { background: #dccaaf; color: #4a3f35; }
 .theme-btn[data-theme="dark"]    { background: #2c2c2c; color: #e0e0e0; }

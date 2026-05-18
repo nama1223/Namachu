@@ -5,8 +5,8 @@ import { showToast, closeModal, openModal, getInstrument, lsSet } from './utils.
 import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold, resumeAudioIfSuspended } from './audio.js';
 import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, toggleFullColor } from './tuner.js';
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook } from './record.js';
-import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset, onScaleInstrumentChange as _scaleInstChange } from './scale.js';
-import { initSettings, getSettings, onInstrumentChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace } from './settings.js';
+import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset } from './scale.js';
+import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace } from './settings.js';
 import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
 
 // ---- Tab management ----
@@ -158,6 +158,7 @@ function exposeGlobals() {
   g.setLang = (lang) => { setLang(lang); applyI18n(); };
 
   // Settings tab
+  g.onFamilyChange = onFamilyChange;
   g.onInstrumentChange = onInstrumentChange;
   g.adjustConcertPitch = adjustConcertPitch;
   g.onNoteStyleChange = onNoteStyleChange;
@@ -190,13 +191,8 @@ function exposeGlobals() {
   g.exportScaleData = exportScaleData;
   g.deleteDataset = deleteDataset;
   g.confirmScaleDataset = confirmScaleDataset;
-  g.onScaleInstrumentChange = () => {
-    const sel = document.getElementById('scaleMeasureInstrument');
-    if (sel) {
-      document.getElementById('instrumentSelect').value = sel.value;
-      onInstrumentChange();
-    }
-  };
+  g.onScaleFamilyChange = onScaleFamilyChange;
+  g.onScaleInstrumentChange = _settingsScaleInstChange;
   g.showScaleHelp = () => openModal('scaleHelpModal');
 
   // Calibration

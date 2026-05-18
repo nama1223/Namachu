@@ -36,41 +36,103 @@ export function initSettings(onChange) {
 
 export function getSettings() { return { ..._settings }; }
 
-// ---- Instrument select (grouped by family) ----
-function populateInstrumentSelect() {
-  const lang = getLang();
-  const html = buildInstrumentOptgroups(lang);
+// ---- Instrument select (2カラム: ファミリー選択 + 楽器選択) ----
 
-  const sel = document.getElementById('instrumentSelect');
-  const sel2 = document.getElementById('scaleMeasureInstrument');
-  if (sel) { sel.innerHTML = html; sel.value = _settings.instrumentId; }
-  if (sel2) { sel2.innerHTML = html; sel2.value = _settings.instrumentId; }
-  updateInstrumentInfo();
+// 現在の楽器IDからファミリーIDを取得
+function _getFamilyForInstrument(instId) {
+  return INSTRUMENTS.find(i => i.id === instId)?.family || INSTRUMENT_FAMILIES[0].id;
 }
 
-function buildInstrumentOptgroups(lang) {
-  const grouped = {};
-  INSTRUMENTS.forEach(inst => {
-    if (!grouped[inst.family]) grouped[inst.family] = [];
-    grouped[inst.family].push(inst);
-  });
+// 指定ファミリーの楽器を instSelId に再充填し、選択値（文字列）を返す
+function _refillInstsByFamily(instSelId, familyId, selectedInstId) {
+  const lang = getLang();
+  const instSel = document.getElementById(instSelId);
+  if (!instSel) return null;
+  const insts = INSTRUMENTS.filter(i => i.family === familyId);
+  instSel.innerHTML = insts.map(inst => {
+    const name = lang === 'ja' ? inst.nameJa : inst.nameEn;
+    return `<option value="${inst.id}">${name}</option>`;
+  }).join('');
+  if (selectedInstId) instSel.value = selectedInstId;
+  return instSel.value; // selectedInstId がそのファミリーになければ先頭を返す
+}
+
+// すべてのファミリー選択肢を構築する HTML
+function _buildFamilyHtml(lang) {
   return INSTRUMENT_FAMILIES.map(fam => {
-    const insts = grouped[fam.id] || [];
-    if (insts.length === 0) return '';
-    const famName = lang === 'ja' ? fam.nameJa : fam.nameEn;
-    const opts = insts.map(inst => {
-      const name = lang === 'ja' ? inst.nameJa : inst.nameEn;
-      return `<option value="${inst.id}">${name}</option>`;
-    }).join('');
-    return `<optgroup label="${famName}">${opts}</optgroup>`;
+    const name = lang === 'ja' ? fam.nameJa : fam.nameEn;
+    return `<option value="${fam.id}">${name}</option>`;
   }).join('');
 }
 
+// (ファミリーセレクト, 楽器セレクト) のペア定義
+const _SELECT_PAIRS = [
+  ['familySelect',      'instrumentSelect'],
+  ['scaleFamilySelect', 'scaleMeasureInstrument'],
+];
+
+function populateInstrumentSelect() {
+  const lang = getLang();
+  const currentInstId = _settings.instrumentId;
+  const currentFamily = _getFamilyForInstrument(currentInstId);
+  const famHtml = _buildFamilyHtml(lang);
+
+  for (const [famSelId, instSelId] of _SELECT_PAIRS) {
+    const famSel = document.getElementById(famSelId);
+    if (famSel) { famSel.innerHTML = famHtml; famSel.value = currentFamily; }
+    _refillInstsByFamily(instSelId, currentFamily, currentInstId);
+  }
+  updateInstrumentInfo();
+}
+
+// 設定タブ: ファミリー変更
+export function onFamilyChange() {
+  const famSel = document.getElementById('familySelect');
+  if (!famSel) return;
+  const familyId = famSel.value;
+  const newInstId = _refillInstsByFamily('instrumentSelect', familyId, null);
+  _settings.instrumentId = newInstId;
+  // スケールタブも同期
+  const scaleFamSel = document.getElementById('scaleFamilySelect');
+  if (scaleFamSel) scaleFamSel.value = familyId;
+  _refillInstsByFamily('scaleMeasureInstrument', familyId, newInstId);
+  updateInstrumentInfo();
+  saveAndNotify();
+}
+
+// 設定タブ: 楽器変更
 export function onInstrumentChange() {
   const sel = document.getElementById('instrumentSelect');
-  _settings.instrumentId = sel?.value || 'concert';
-  const sel2 = document.getElementById('scaleMeasureInstrument');
-  if (sel2) sel2.value = _settings.instrumentId;
+  if (!sel) return;
+  _settings.instrumentId = sel.value;
+  const scaleInstSel = document.getElementById('scaleMeasureInstrument');
+  if (scaleInstSel) scaleInstSel.value = _settings.instrumentId;
+  updateInstrumentInfo();
+  saveAndNotify();
+}
+
+// スケールタブ: ファミリー変更
+export function onScaleFamilyChange() {
+  const famSel = document.getElementById('scaleFamilySelect');
+  if (!famSel) return;
+  const familyId = famSel.value;
+  const newInstId = _refillInstsByFamily('scaleMeasureInstrument', familyId, null);
+  _settings.instrumentId = newInstId;
+  // 設定タブも同期
+  const settingsFamSel = document.getElementById('familySelect');
+  if (settingsFamSel) settingsFamSel.value = familyId;
+  _refillInstsByFamily('instrumentSelect', familyId, newInstId);
+  updateInstrumentInfo();
+  saveAndNotify();
+}
+
+// スケールタブ: 楽器変更
+export function onScaleInstrumentChange() {
+  const sel = document.getElementById('scaleMeasureInstrument');
+  if (!sel) return;
+  _settings.instrumentId = sel.value;
+  const settingsInstSel = document.getElementById('instrumentSelect');
+  if (settingsInstSel) settingsInstSel.value = _settings.instrumentId;
   updateInstrumentInfo();
   saveAndNotify();
 }

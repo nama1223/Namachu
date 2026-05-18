@@ -146,7 +146,10 @@
 
     <div class="scale-instrument-row">
       <label data-i18n="label_instrument">楽器</label>
-      <select id="scaleMeasureInstrument" onchange="onScaleInstrumentChange()"></select>
+      <div class="instrument-dual-select">
+        <select id="scaleFamilySelect" onchange="onScaleFamilyChange()"></select>
+        <select id="scaleMeasureInstrument" onchange="onScaleInstrumentChange()"></select>
+      </div>
     </div>
 
     <!-- チューニング確認 (計測前のみ表示) -->
@@ -205,7 +208,10 @@
         <span class="card-arrow">▼</span>
       </div>
       <div class="setting-card-body">
-        <select id="instrumentSelect" onchange="onInstrumentChange()"></select>
+        <div class="instrument-dual-select">
+          <select id="familySelect" onchange="onFamilyChange()"></select>
+          <select id="instrumentSelect" onchange="onInstrumentChange()"></select>
+        </div>
         <div class="setting-row" style="margin-top:8px;">
           <label data-i18n="label_transposition">移調</label>
           <span id="transpositionLabel" class="setting-value-badge"></span>
