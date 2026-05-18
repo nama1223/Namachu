@@ -149,13 +149,10 @@
       <select id="scaleMeasureInstrument" onchange="onScaleInstrumentChange()"></select>
     </div>
 
-    <!-- チューニング確認 (常に反応) -->
-    <div class="scale-tuning-section">
+    <!-- チューニング確認 (計測前のみ表示) -->
+    <div class="scale-tuning-section" id="scaleTuningSection">
       <p class="scale-hint" data-i18n="hint_scale_tuning">まずA4（または楽器の基準音）でチューニングしてください</p>
-      <div class="scale-tuning-meter">
-        <div class="scale-ref-note" id="scaleRefNote">--</div>
-        <div class="scale-tuning-cents" id="scaleTuningCents">-- ¢</div>
-      </div>
+      <canvas class="scale-mini-tuner" id="scaleMiniTuner"></canvas>
     </div>
 
     <!-- 測定コントロール -->

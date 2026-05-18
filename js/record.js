@@ -33,6 +33,12 @@ let _freqEma = null;          // 周波数の指数移動平均（オクター�
 let _octaveShiftCount = 0;    // オクターヴずれが何フレーム連続したか
 let _silenceStartMs = null;   // 直前まで音があり無音に入った時刻（猶予判定用）
 
+// ---- Watchdog ----
+let _lastAudioFrameMs = 0;    // onRecordPitch が最後に呼ばれた時刻
+let _watchdogTimer = null;    // setInterval ID
+let _repairCallback = null;   // マイク再起動などの修復コールバック
+let _preStartHook = null;     // 録音開始前に呼ぶ async フック（AudioContext resume など）
+
 // Canvas
 let canvas = null;
 let ctx = null;
@@ -61,6 +67,8 @@ export function setRecordInstrument(inst) { _instrument = inst; buildPitchAxis()
 export function setRecordConcertPitch(hz) { _concertPitch = hz; }
 export function setRecordNoteStyle(s) { _noteStyle = s; buildPitchAxis(); }
 export function setRecordSilenceGrace(ms) { _silenceGraceMs = ms; }
+export function setRecordRepairCallback(fn) { _repairCallback = fn; }
+export function setRecordPreStartHook(fn) { _preStartHook = fn; }
 
 function resizeCanvas() {
   if (!canvas) return;
@@ -85,11 +93,35 @@ function buildPitchAxis() {
   el.innerHTML = spans.join('');
 }
 
+// ---- Watchdog helpers ----
+function _startWatchdog() {
+  _lastAudioFrameMs = performance.now();
+  _stopWatchdog();
+  _watchdogTimer = setInterval(() => {
+    if (!recording) { _stopWatchdog(); return; }
+    const age = performance.now() - _lastAudioFrameMs;
+    if (age > 1500) {
+      console.warn('[NamaChu] watchdog: no audio frame for', age.toFixed(0), 'ms — repairing');
+      _lastAudioFrameMs = performance.now(); // reset to avoid rapid re-trigger
+      _repairCallback?.();
+    }
+  }, 500);
+}
+
+function _stopWatchdog() {
+  clearInterval(_watchdogTimer);
+  _watchdogTimer = null;
+}
+
 // ---- Recording ----
-export function toggleRecording() {
+export async function toggleRecording() {
   if (playing) stopPlayback();
-  if (recording) stopRecording();
-  else startRecording();
+  if (recording) {
+    stopRecording();
+  } else {
+    if (_preStartHook) await _preStartHook();
+    startRecording();
+  }
 }
 
 function startRecording() {
@@ -105,9 +137,11 @@ function startRecording() {
   document.getElementById('recBtn')?.classList.add('recording');
   document.getElementById('playBackBtn').disabled = true;
   updateTimeBar(0, 0);
+  _startWatchdog();
 }
 
 function stopRecording() {
+  _stopWatchdog();
   recording = false;
   finalizeCurrentEvent(performance.now());
   trimLeadingSilence();
@@ -171,6 +205,7 @@ function sanitizeFreq(freq) {
 export function onRecordPitch(freq, clarity, clarityThreshold) {
   if (!recording) return;
   const now = performance.now();
+  _lastAudioFrameMs = now; // watchdog リセット
   const timeMs = now - recordStartTime;
 
   // --- 無音判定 ---
@@ -242,7 +277,7 @@ function finalizeCurrentEvent(now) {
   const dur = timeMs - _lastEventStart;
   if (dur < MIN_NOTE_MS) { _lastFreq = null; _freqSamples = []; return; }
 
-  // 最頻MIDIノート（mode）でレーン位置を決定（スラー含む場合の誤配置を防ぐ）
+  // ---- 最頻 MIDI 値（モード）でレーン位置とオクターヴ基準を決定 ----
   const midiCounts = {};
   _freqSamples.forEach(s => {
     const m = Math.round(freqToMidi(s.freq, _concertPitch));
@@ -251,11 +286,29 @@ function finalizeCurrentEvent(now) {
   const modeMidi = +Object.keys(midiCounts).reduce((a, b) =>
     midiCounts[a] > midiCounts[b] ? a : b
   );
+
+  // ---- 音符内オクターヴ補正 ----
+  // モードから 9半音以上外れたサンプルは、オクターヴ単位の倍率で補正を試みる
+  const correctedSamples = _freqSamples.map(s => {
+    const m = freqToMidi(s.freq, _concertPitch);
+    const diff = m - modeMidi;
+    if (Math.abs(diff) < 9) return s;
+    const oct = Math.round(diff / 12);
+    if (oct === 0) return s;
+    const correctedFreq = s.freq / Math.pow(2, oct);
+    const newDiff = freqToMidi(correctedFreq, _concertPitch) - modeMidi;
+    if (Math.abs(newDiff) < 4) return { ...s, freq: correctedFreq };
+    return s;
+  });
+  _freqSamples = correctedSamples;
+
   const info = midiToNoteInfo(modeMidi);
+  // 最終 freq は補正後の最終サンプルを優先
+  const lastSampleFreq = _freqSamples[_freqSamples.length - 1]?.freq ?? _lastFreq;
 
   recordEvents.push({
     timeMs: _lastEventStart,
-    freq: _lastFreq,
+    freq: lastSampleFreq,
     midi: modeMidi,
     note: info.note,
     octave: info.octave,

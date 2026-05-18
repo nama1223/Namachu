@@ -458,17 +458,54 @@ function _scoreSequence(seq) {
     i = endIdx > i ? endIdx : i + 1;
   }
 
-  const notes = plateaus.map(p => p.center);
+  // オクターヴ関連プラトーの再分類:
+  // 隣接する長いプラトーに対して ~12 半音離れた短いプラトーは「裏返り」として除外
+  const isFlipPlateau = new Array(plateaus.length).fill(false);
+  for (let i = 0; i < plateaus.length; i++) {
+    if (isFlipPlateau[i]) continue;
+    const p = plateaus[i];
+    const pLen = p.end - p.start;
+    for (let j = 0; j < plateaus.length; j++) {
+      if (j === i || isFlipPlateau[j]) continue;
+      const q = plateaus[j];
+      const qLen = q.end - q.start;
+      if (qLen < pLen * 1.5) continue; // q が p より十分長くなければスキップ
+      const semis = Math.abs(p.center - q.center);
+      // ~12 または ~24 半音差 = オクターヴ関連（±2.5 半音の誤差を許容）
+      const octaveRelated = Math.abs(semis - 12) < 2.5 || Math.abs(semis - 24) < 2.5;
+      if (!octaveRelated) continue;
+      // 時間的に隣接（30フレーム以内）または重複している
+      const gap = Math.min(Math.abs(p.start - q.end), Math.abs(p.end - q.start));
+      const overlapping = !(p.end <= q.start || q.end <= p.start);
+      if (gap <= 30 || overlapping) {
+        isFlipPlateau[i] = true;
+        break;
+      }
+    }
+  }
 
-  // 裏返り: プラトー内で中心から FLIP_SEMIS 以上離れた点
+  // 正規プラトー（裏返りでないもの）だけを音符とみなす
+  const notes = plateaus.filter((_, i) => !isFlipPlateau[i]).map(p => p.center);
+
+  // 裏返り: 通常プラトー内の外れ点 + 裏返りプラトー全体
   let flips = 0;
   const flipPositions = [];
-  for (const p of plateaus) {
-    for (let k = p.start; k < p.end; k++) {
-      if (midis[k] === null) continue;
-      if (Math.abs(midis[k] - p.center) >= FLIP_SEMIS) {
-        flips++;
-        flipPositions.push(k);
+  for (let i = 0; i < plateaus.length; i++) {
+    const p = plateaus[i];
+    if (isFlipPlateau[i]) {
+      // 裏返りプラトー: フレームをすべてマーク、プラトー単位で 1 回カウント
+      flips++;
+      for (let k = p.start; k < p.end; k++) {
+        if (midis[k] !== null) flipPositions.push(k);
+      }
+    } else {
+      // 通常プラトー内の単発外れ点
+      for (let k = p.start; k < p.end; k++) {
+        if (midis[k] === null) continue;
+        if (Math.abs(midis[k] - p.center) >= FLIP_SEMIS) {
+          flips++;
+          flipPositions.push(k);
+        }
       }
     }
   }

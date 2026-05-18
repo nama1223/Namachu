@@ -27,20 +27,6 @@
   margin: 0 0 8px;
   line-height: 1.4;
 }
-.scale-tuning-meter {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.scale-ref-note {
-  font-size: 1.4rem;
-  font-weight: 900;
-  color: var(--primary-color);
-}
-.scale-tuning-cents {
-  font-size: 1.1rem;
-  font-weight: bold;
-}
 
 /* ---- コントロール ---- */
 .scale-controls {
@@ -122,7 +108,16 @@
 .scale-chart {
   width: 100%;
   display: block;
-  height: 200px;
+  height: 260px;
+}
+
+/* ミニチューナーグラフ */
+.scale-mini-tuner {
+  display: block;
+  width: 100%;
+  height: 64px;
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 /* ---- 比較セクション ---- */

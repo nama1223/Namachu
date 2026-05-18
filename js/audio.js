@@ -59,6 +59,12 @@ export function stopMic() {
 
 export function isMicRunning() { return _running; }
 
+export async function resumeAudioIfSuspended() {
+  if (audioCtx && audioCtx.state === 'suspended') {
+    try { await audioCtx.resume(); } catch (e) {}
+  }
+}
+
 export let minRms = 0.01;
 export let clarityThreshold = 0.85;
 export function setMinRms(v) { minRms = v; }

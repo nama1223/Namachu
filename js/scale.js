@@ -33,6 +33,13 @@ const COLORS = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1'];
 let chartCanvas = null;
 let chartCtx = null;
 
+// Mini-tuner graph (pre-measurement)
+let miniCanvas = null;
+let miniCtx = null;
+const MINI_BUF_SIZE = 300; // ~5s at 60fps
+const _miniBuf = [];       // { cents: number|null, noteName: string|null }
+let _miniRafId = null;
+
 export function initScale(opts = {}) {
   _instrument = opts.instrument ?? null;
   _concertPitch = opts.concertPitch ?? 440;
@@ -42,9 +49,13 @@ export function initScale(opts = {}) {
   chartCanvas = document.getElementById('scaleChart');
   chartCtx = chartCanvas?.getContext('2d');
 
+  miniCanvas = document.getElementById('scaleMiniTuner');
+  miniCtx = miniCanvas?.getContext('2d');
+
   loadSavedDatasets();
   renderChart();
   renderDataList();
+  _startMiniLoop();
 }
 
 export function setScaleInstrument(inst) { _instrument = inst; renderChart(); }
@@ -71,6 +82,9 @@ function startMeasure() {
   document.getElementById('scaleStartBtn')?.classList.add('measuring');
   const span = document.querySelector('#scaleStartBtn span');
   if (span) span.textContent = t('btn_stop');
+  // チューニングセクションを非表示に
+  const tuningSection = document.getElementById('scaleTuningSection');
+  if (tuningSection) tuningSection.style.display = 'none';
   document.getElementById('scaleCurrentSection').style.display = '';
   document.getElementById('scaleCurrentNote').textContent = '--';
   document.getElementById('scaleCurrentCents').textContent = '-- ¢';
@@ -88,6 +102,9 @@ function stopMeasure() {
   const span = document.querySelector('#scaleStartBtn span');
   if (span) span.textContent = t('btn_scale_start');
   document.getElementById('scaleCurrentSection').style.display = 'none';
+  // チューニングセクションを再表示
+  const tuningSection = document.getElementById('scaleTuningSection');
+  if (tuningSection) tuningSection.style.display = '';
   renderChart();
 
   if (Object.keys(currentResults).length > 0) {
@@ -129,16 +146,16 @@ export function onScalePitch(freq, clarity) {
   const valid = freq && clarity >= _clarityThreshold;
   const now = performance.now();
 
-  // Always update the tuning reference display (even when not measuring)
-  if (valid) {
-    const midi = freqToMidi(freq, _concertPitch);
-    const info = midiToNoteInfo(midi);
-    const sign = info.cents >= 0 ? '+' : '';
-    document.getElementById('scaleRefNote').textContent =
-      noteName(info.note, info.octave, _noteStyle, true);
-    document.getElementById('scaleTuningCents').textContent = `${sign}${info.cents} ¢`;
-  } else {
-    document.getElementById('scaleTuningCents').textContent = '-- ¢';
+  // ミニチューナーグラフ用バッファ更新（測定前のみ）
+  if (!measuring) {
+    if (valid) {
+      const midi = freqToMidi(freq, _concertPitch);
+      const info = midiToNoteInfo(midi);
+      _miniBuf.push({ cents: info.cents, label: noteName(info.note, info.octave, _noteStyle, true) });
+    } else {
+      _miniBuf.push({ cents: null, label: null });
+    }
+    if (_miniBuf.length > MINI_BUF_SIZE) _miniBuf.shift();
   }
 
   if (!measuring) return;
@@ -286,6 +303,103 @@ function renderDataList() {
     </div>`).join('');
 }
 
+// ---- Mini-tuner graph ----
+function _startMiniLoop() {
+  cancelAnimationFrame(_miniRafId);
+  function loop() {
+    _miniRafId = requestAnimationFrame(loop);
+    if (!measuring) _drawMiniTuner();
+  }
+  loop();
+}
+
+function _drawMiniTuner() {
+  if (!miniCtx || !miniCanvas) return;
+  const dpr = devicePixelRatio;
+  const w = miniCanvas.offsetWidth * dpr;
+  const h = miniCanvas.offsetHeight * dpr;
+  if (w === 0 || h === 0) return;
+  if (miniCanvas.width !== w || miniCanvas.height !== h) {
+    miniCanvas.width = w;
+    miniCanvas.height = h;
+  }
+
+  const ctx = miniCtx;
+  const style = getComputedStyle(document.documentElement);
+  const YMAX = 50;
+  const padL = 28 * dpr, padR = 6 * dpr, padT = 4 * dpr, padB = 4 * dpr;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+  const midY = padT + plotH / 2;
+
+  ctx.fillStyle = style.getPropertyValue('--bg-color').trim() || '#fff';
+  ctx.fillRect(0, 0, w, h);
+
+  // Grid lines
+  ctx.strokeStyle = style.getPropertyValue('--dot-weak').trim();
+  ctx.lineWidth = 1 * dpr;
+  for (const c of [-50, -25, 0, 25, 50]) {
+    const y = midY - (c / YMAX) * (plotH / 2);
+    ctx.setLineDash(c === 0 ? [] : [3 * dpr, 3 * dpr]);
+    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+    ctx.setLineDash([]);
+    if (c !== 0) {
+      ctx.fillStyle = style.getPropertyValue('--text-color').trim();
+      ctx.font = `${8 * dpr}px sans-serif`;
+      ctx.textAlign = 'right';
+      ctx.fillText((c > 0 ? '+' : '') + c, padL - 2 * dpr, y + 3 * dpr);
+    }
+  }
+
+  const inTune = style.getPropertyValue('--in-tune-color').trim() || '#4caf50';
+  const sharp  = style.getPropertyValue('--sharp-color').trim()  || '#e53935';
+  const flat   = style.getPropertyValue('--flat-color').trim()   || '#1e88e5';
+
+  const buf = _miniBuf;
+  if (buf.length === 0) return;
+
+  const colW = plotW / MINI_BUF_SIZE;
+  const offsetX = padL + (MINI_BUF_SIZE - buf.length) * colW;
+
+  // Draw line + dots
+  let prevPt = null;
+  let lastLabel = null;
+  for (let i = 0; i < buf.length; i++) {
+    const entry = buf[i];
+    if (entry.cents === null) { prevPt = null; continue; }
+    const x = offsetX + i * colW;
+    const cents = clamp(entry.cents, -YMAX, YMAX);
+    const y = midY - (cents / YMAX) * (plotH / 2);
+    const color = Math.abs(cents) <= 5 ? inTune : cents > 0 ? sharp : flat;
+
+    if (prevPt) {
+      ctx.strokeStyle = prevPt.color;
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(prevPt.x, prevPt.y);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, 2 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+
+    prevPt = { x, y, color };
+    if (entry.label) lastLabel = entry.label;
+  }
+
+  // 現在の音名を右端に表示
+  if (lastLabel && buf[buf.length - 1]?.cents !== null) {
+    const lastEntry = buf[buf.length - 1];
+    const color = Math.abs(lastEntry.cents) <= 5 ? inTune : lastEntry.cents > 0 ? sharp : flat;
+    ctx.font = `bold ${11 * dpr}px sans-serif`;
+    ctx.textAlign = 'left';
+    ctx.fillStyle = color;
+    ctx.fillText(lastLabel, padL + 4 * dpr, padT + 14 * dpr);
+  }
+}
+
 // ---- Chart ----
 function renderChart() {
   if (!chartCtx || !chartCanvas || !_instrument) return;
@@ -304,60 +418,90 @@ function renderChart() {
   const hiMidi = _instrument.hiMidi;
   const noteCount = hiMidi - loMidi + 1;
 
-  const padL = 36 * dpr, padR = 12 * dpr, padT = 16 * dpr, padB = 28 * dpr;
+  // padT は上部ラベル用に大きめ
+  const padL = 36 * dpr, padR = 12 * dpr, padT = 26 * dpr, padB = 28 * dpr;
   const plotW = w - padL - padR;
   const plotH = h - padT - padB;
-  const YMAX = 30;
+  const YMAX = 50;
   const midY = padT + plotH / 2;
+  const textColor = style.getPropertyValue('--text-color').trim();
 
-  // Grid
+  // Grid: 10¢ ごと
   ctx.strokeStyle = style.getPropertyValue('--dot-weak').trim();
   ctx.lineWidth = 1 * dpr;
-  for (const c of [-25, -10, 0, 10, 25]) {
+  for (let c = -50; c <= 50; c += 10) {
     const y = midY - (c / YMAX) * (plotH / 2);
-    ctx.setLineDash(c === 0 ? [] : [4 * dpr, 4 * dpr]);
+    ctx.setLineDash(c === 0 ? [] : (Math.abs(c) === 50 ? [5 * dpr, 3 * dpr] : [2 * dpr, 4 * dpr]));
     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = style.getPropertyValue('--text-color').trim();
+    ctx.fillStyle = textColor;
     ctx.font = `${9 * dpr}px sans-serif`;
     ctx.textAlign = 'right';
     ctx.fillText((c > 0 ? '+' : '') + c, padL - 3 * dpr, y + 3 * dpr);
   }
 
-  // X axis labels
+  // X axis labels — 衝突なしでできるだけ多く表示
+  // 自然音は下側、黒鍵は上側
   const colW = plotW / noteCount;
-  ctx.fillStyle = style.getPropertyValue('--text-color').trim();
-  ctx.font = `${8 * dpr}px sans-serif`;
-  ctx.textAlign = 'center';
-  for (let i = 0; i < noteCount; i++) {
-    const m = loMidi + i;
-    const info = midiToNoteInfo(m);
-    if (info.note === 0) {
+  const BLACK_SET = new Set([1, 3, 6, 8, 10]);
+  const NATURAL_PRI = [0, 7, 4, 9, 2, 5, 11]; // C G E A D F B の優先度
+  const minGap = 15 * dpr;
+  const usedBelow = [];
+  const usedAbove = [];
+
+  for (const pri of NATURAL_PRI) {
+    for (let i = 0; i < noteCount; i++) {
+      const m = loMidi + i;
+      const info = midiToNoteInfo(m);
+      if (info.note !== pri) continue;
       const x = padL + (i + 0.5) * colW;
-      ctx.fillText(noteName(info.note, info.octave, 'abc', true), x, h - padB + 10 * dpr);
+      if (usedBelow.some(ox => Math.abs(x - ox) < minGap)) continue;
+      usedBelow.push(x);
+      const isC = (pri === 0);
+      ctx.font = `${isC ? 'bold ' : ''}${8 * dpr}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillStyle = textColor + (isC ? '' : 'aa');
+      const label = isC
+        ? noteName(info.note, info.octave, _noteStyle, true)
+        : noteName(info.note, info.octave, _noteStyle, false);
+      ctx.fillText(label, x, h - padB + 10 * dpr);
     }
   }
 
+  for (let i = 0; i < noteCount; i++) {
+    const m = loMidi + i;
+    const info = midiToNoteInfo(m);
+    if (!BLACK_SET.has(info.note)) continue;
+    const x = padL + (i + 0.5) * colW;
+    if (usedAbove.some(ox => Math.abs(x - ox) < minGap)) continue;
+    usedAbove.push(x);
+    ctx.font = `${7 * dpr}px sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.fillStyle = textColor + '88';
+    ctx.fillText(noteName(info.note, info.octave, _noteStyle, false), x, padT - 5 * dpr);
+  }
+
   // Current measurement (dashed)
-  drawDataset(ctx, currentResults, style.getPropertyValue('--text-color').trim() || '#888',
-    loMidi, hiMidi, colW, midY, YMAX, padL, dpr, true);
+  drawDataset(ctx, currentResults, textColor || '#888',
+    loMidi, hiMidi, colW, midY, YMAX, padL, padT, padB, dpr, true);
 
   // Saved datasets
   savedDatasets.forEach(ds => {
     const r = {};
     for (const [m, v] of Object.entries(ds.results)) r[m] = { avg: v };
-    drawDataset(ctx, r, ds.color, loMidi, hiMidi, colW, midY, YMAX, padL, dpr, false);
+    drawDataset(ctx, r, ds.color, loMidi, hiMidi, colW, midY, YMAX, padL, padT, padB, dpr, false);
   });
 }
 
-function drawDataset(ctx, results, color, loMidi, hiMidi, colW, midY, YMAX, padL, dpr, isCurrent) {
+function drawDataset(ctx, results, color, loMidi, hiMidi, colW, midY, YMAX, padL, padT, padB, dpr, isCurrent) {
+  const plotH = chartCanvas.height - padT - padB;
   const pts = [];
   for (let m = loMidi; m <= hiMidi; m++) {
     const entry = results[m];
     if (!entry) continue;
     const cents = entry.avg ?? entry;
     const x = padL + (m - loMidi + 0.5) * colW;
-    const y = midY - (clamp(cents, -YMAX, YMAX) / YMAX) * ((chartCanvas.height - 44 * dpr) / 2);
+    const y = midY - (clamp(cents, -YMAX, YMAX) / YMAX) * (plotH / 2);
     pts.push({ x, y });
   }
   if (pts.length === 0) return;
