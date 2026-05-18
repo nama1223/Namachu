@@ -64,33 +64,59 @@ button {
 }
 #toastMsg.show { opacity: 1; }
 
-/* ---- App footer ---- */
-.app-footer {
+/* ---- Footer (NamaMeto準拠) ---- */
+.lang-selector-outer {
   display: flex;
-  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 14px 0 10px;
+  padding: 14px 0 6px;
   width: 95%;
   max-width: 450px;
   border-top: 1px solid var(--dot-weak);
   margin-top: 6px;
 }
-.footer-lang {
-  display: flex;
-  gap: 8px;
-}
 .footer-credit {
-  font-size: 0.72rem;
-  opacity: 0.5;
+  font-size: 0.7rem;
+  opacity: 0.55;
+  align-self: center;
+  margin-left: 4px;
+  white-space: nowrap;
 }
-.footer-wishlist {
-  font-size: 0.72rem;
-  color: var(--primary-color);
+.footer-wishlist-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  padding: 4px 0;
+  width: 95%;
+  max-width: 450px;
+  margin: 0 auto;
+}
+.footer-amazon-link {
+  display: flex;
+  align-items: center;
   text-decoration: none;
-  opacity: 0.7;
+  opacity: 0.75;
+  transition: opacity 0.2s;
 }
-.footer-wishlist:hover { opacity: 1; }
+.footer-amazon-link:hover { opacity: 1; }
+.footer-amazon-logo {
+  display: inline-block;
+  width: 85px;
+  height: 35px;
+  background-image: url('https://m.media-amazon.com/images/G/09/gno/sprites/nav-sprite-global-1x-reorg-privacy._CB546377955_.png');
+  background-position: -5px -85px;
+  background-repeat: no-repeat;
+  background-size: auto;
+  flex-shrink: 0;
+  background-color: #000;
+}
+.footer-wishlist-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  color: var(--text-color);
+  opacity: 0.75;
+}
 
 /* ---- Lang button ---- */
 .lang-btn {

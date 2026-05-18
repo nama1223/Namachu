@@ -337,14 +337,17 @@
 
 </div><!-- /.container -->
 
-<!-- ===== アプリフッター ===== -->
-<div class="app-footer">
-  <div class="footer-lang">
-    <button class="lang-btn" id="langJa" onclick="setLang('ja')">日本語</button>
-    <button class="lang-btn" id="langEn" onclick="setLang('en')">English</button>
-  </div>
-  <div class="footer-credit">Developed with Gemini &amp; Claude</div>
-  <a class="footer-wishlist" href="https://www.amazon.co.jp/hz/wishlist/ls/YOUR_LIST_ID" target="_blank" rel="noopener" id="wishlistLink">Amazon ほしいものリスト</a>
+<!-- ===== フッター (NamaMeto準拠) ===== -->
+<div class="lang-selector-outer">
+  <button class="lang-btn" id="langJa" onclick="setLang('ja')">日本語</button>
+  <button class="lang-btn" id="langEn" onclick="setLang('en')">English</button>
+  <span class="footer-credit">Developed with Gemini &amp; Claude</span>
+</div>
+<div class="footer-wishlist-row">
+  <a href="https://www.amazon.jp/hz/wishlist/ls/21PS61YG1P32B" target="_blank" rel="noreferrer noopener" class="footer-amazon-link" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.75'">
+    <span class="footer-amazon-logo"></span>
+  </a>
+  <span class="footer-wishlist-label" data-i18n="label_wishlist">ほしいものリスト</span>
 </div>
 
 <div class="ad-spacer"></div>

@@ -33,6 +33,11 @@ let _freqEma = null;          // 周波数の指数移動平均（オクター�
 let _octaveShiftCount = 0;    // オクターヴずれが何フレーム連続したか
 let _silenceStartMs = null;   // 直前まで音があり無音に入った時刻（猶予判定用）
 
+// ---- Drag scroll ----
+let _dragActive = false;
+let _dragStartX = 0;
+let _dragStartScrollMs = 0;
+
 // ---- Watchdog ----
 let _lastAudioFrameMs = 0;    // onRecordPitch が最後に呼ばれた時刻
 let _watchdogTimer = null;    // setInterval ID
@@ -60,6 +65,7 @@ export function initRecord(opts = {}) {
   resizeCanvas();
   window.addEventListener('resize', resizeCanvas);
   buildPitchAxis();
+  _initDragScroll();
   startDrawLoop();
 }
 
@@ -91,6 +97,49 @@ function buildPitchAxis() {
     spans.push(`<span class="${isBlack ? 'axis-black' : 'axis-white'}">${label}</span>`);
   }
   el.innerHTML = spans.join('');
+}
+
+// ---- Drag scroll ----
+function _initDragScroll() {
+  if (!canvas) return;
+
+  function canDrag() { return !recording && !playing && getTotalDuration() > 0; }
+
+  function startDrag(clientX) {
+    if (!canDrag()) return;
+    _dragActive = true;
+    _dragStartX = clientX;
+    _dragStartScrollMs = scrollMs;
+    canvas.style.cursor = 'grabbing';
+  }
+
+  function moveDrag(clientX) {
+    if (!_dragActive) return;
+    const dx = clientX - _dragStartX;
+    const msPerPx = viewMs / (canvas.offsetWidth || 1);
+    const maxScroll = Math.max(0, getTotalDuration() - viewMs * 0.1);
+    scrollMs = Math.max(0, Math.min(_dragStartScrollMs - dx * msPerPx, maxScroll));
+    updateTimeBar(scrollMs + viewMs * 0.75, getTotalDuration());
+  }
+
+  function endDrag() {
+    _dragActive = false;
+    canvas.style.cursor = canDrag() ? 'grab' : '';
+  }
+
+  // マウス
+  canvas.addEventListener('mousedown',  (e) => startDrag(e.clientX));
+  canvas.addEventListener('mousemove',  (e) => moveDrag(e.clientX));
+  canvas.addEventListener('mouseup',    endDrag);
+  canvas.addEventListener('mouseleave', endDrag);
+
+  // タッチ
+  canvas.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientX), { passive: true });
+  canvas.addEventListener('touchmove',  (e) => { e.preventDefault(); moveDrag(e.touches[0].clientX); }, { passive: false });
+  canvas.addEventListener('touchend',   endDrag);
+
+  // カーソル（録音データがある時は grab を示す）
+  canvas.addEventListener('mouseenter', () => { if (canDrag()) canvas.style.cursor = 'grab'; });
 }
 
 // ---- Watchdog helpers ----

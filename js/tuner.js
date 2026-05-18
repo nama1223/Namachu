@@ -261,10 +261,10 @@ function drawGraph() {
     ctx.globalAlpha = 1;
   }
 
-  // 行の境界線
-  ctx.strokeStyle = dotWeak;
-  ctx.globalAlpha = 0.6;
-  ctx.lineWidth = 1 * dpr;
+  // 行の境界線（太め・高コントラストで２段を明確に分ける）
+  ctx.strokeStyle = textCol;
+  ctx.globalAlpha = 0.55;
+  ctx.lineWidth = 2.5 * dpr;
   ctx.beginPath();
   ctx.moveTo(0, rowH); ctx.lineTo(w, rowH);
   ctx.stroke();

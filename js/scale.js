@@ -29,6 +29,16 @@ let currentResults = {};
 let savedDatasets = [];
 const COLORS = ['#e53935','#1e88e5','#43a047','#fb8c00','#8e24aa','#00acc1'];
 
+// 音名ごとの色 (6色 × 2 = 12半音をカバー。C/F#=赤, C#/G=橙, D/G#=黄, D#/A=緑, E/A#=青, F/B=紫)
+const NOTE_COLORS_6 = ['#e53935','#fb8c00','#f9a825','#43a047','#1e88e5','#7b1fa2'];
+function _noteColor(midi) {
+  return NOTE_COLORS_6[((Math.round(midi) % 12) + 12) % 12 % 6];
+}
+
+// ポップアップ
+let _scalePopup = null;
+let _popupTimer = null;
+
 // Chart
 let chartCanvas = null;
 let chartCtx = null;
@@ -56,6 +66,7 @@ export function initScale(opts = {}) {
   renderChart();
   renderDataList();
   _startMiniLoop();
+  _initChartInteraction();
 }
 
 export function setScaleInstrument(inst) { _instrument = inst; renderChart(); }
@@ -303,6 +314,90 @@ function renderDataList() {
     </div>`).join('');
 }
 
+// ---- Chart クリックポップアップ ----
+function _initChartInteraction() {
+  if (!chartCanvas) return;
+  chartCanvas.addEventListener('click', _onChartClick);
+  chartCanvas.addEventListener('touchend', (e) => {
+    if (e.changedTouches.length === 0) return;
+    const t = e.changedTouches[0];
+    _onChartClick({ clientX: t.clientX, clientY: t.clientY });
+  });
+  // 外側クリックで閉じる
+  document.addEventListener('click', (e) => {
+    if (e.target !== chartCanvas && _scalePopup) _scalePopup.style.display = 'none';
+  });
+}
+
+function _ensurePopup() {
+  if (_scalePopup) return _scalePopup;
+  _scalePopup = document.createElement('div');
+  _scalePopup.style.cssText = [
+    'position:fixed', 'z-index:3000', 'pointer-events:none', 'display:none',
+    'padding:8px 14px', 'border-radius:10px', 'line-height:1.5',
+    'background:var(--surface-color,#fff)', 'color:var(--text-color,#333)',
+    'border:1px solid var(--dot-weak,#ccc)', 'box-shadow:0 2px 10px rgba(0,0,0,0.2)',
+    'font-size:0.9rem', 'font-weight:bold', 'text-align:center',
+  ].join(';');
+  document.body.appendChild(_scalePopup);
+  return _scalePopup;
+}
+
+function _showScalePopup(clientX, clientY, entries) {
+  const popup = _ensurePopup();
+  popup.innerHTML = entries.map(({ name, cents, color }) => {
+    const sign = cents >= 0 ? '+' : '';
+    return `<div style="color:${color};font-size:1.05rem">${name}</div>` +
+           `<div style="font-size:0.85rem;opacity:0.85">${sign}${cents} ¢</div>`;
+  }).join('<hr style="border:none;border-top:1px solid var(--dot-weak);margin:4px 0">');
+  popup.style.display = 'block';
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const pw = 110, ph = 60 * entries.length;
+  popup.style.left = Math.min(clientX + 12, vw - pw - 8) + 'px';
+  popup.style.top  = Math.max(8, Math.min(clientY - ph / 2, vh - ph - 8)) + 'px';
+  clearTimeout(_popupTimer);
+  _popupTimer = setTimeout(() => { popup.style.display = 'none'; }, 4000);
+}
+
+function _onChartClick(e) {
+  if (!chartCanvas || !_instrument) return;
+  const rect = chartCanvas.getBoundingClientRect();
+  const cssX = e.clientX - rect.left;
+
+  const noteCount = _instrument.hiMidi - _instrument.loMidi + 1;
+  const padL = 36, padR = 12;
+  const plotW = chartCanvas.offsetWidth - padL - padR;
+  const colW = plotW / noteCount;
+  const relX = cssX - padL;
+  if (relX < 0 || relX > plotW) { if (_scalePopup) _scalePopup.style.display = 'none'; return; }
+
+  const i = Math.floor(relX / colW);
+  const m = _instrument.loMidi + i;
+  if (m < _instrument.loMidi || m > _instrument.hiMidi) return;
+
+  const info = midiToNoteInfo(m);
+  const noteLbl = noteName(info.note, info.octave, _noteStyle, true);
+  const color = _noteColor(m);
+  const entries = [];
+
+  if (currentResults[m]) {
+    entries.push({ name: noteLbl + ' (現在)', cents: Math.round(currentResults[m].avg), color });
+  }
+  savedDatasets.forEach(ds => {
+    const val = ds.results[m];
+    if (val !== undefined) {
+      const cents = typeof val === 'object' ? val.avg : val;
+      entries.push({ name: `${noteLbl} (${ds.name})`, cents: Math.round(cents), color: ds.color });
+    }
+  });
+
+  if (entries.length > 0) {
+    _showScalePopup(e.clientX, e.clientY, entries);
+  } else {
+    if (_scalePopup) _scalePopup.style.display = 'none';
+  }
+}
+
 // ---- Mini-tuner graph ----
 function _startMiniLoop() {
   cancelAnimationFrame(_miniRafId);
@@ -460,11 +555,13 @@ function renderChart() {
       const isC = (pri === 0);
       ctx.font = `${isC ? 'bold ' : ''}${8 * dpr}px sans-serif`;
       ctx.textAlign = 'center';
-      ctx.fillStyle = textColor + (isC ? '' : 'aa');
+      ctx.fillStyle = _noteColor(m);
+      ctx.globalAlpha = isC ? 1 : 0.85;
       const label = isC
         ? noteName(info.note, info.octave, _noteStyle, true)
         : noteName(info.note, info.octave, _noteStyle, false);
       ctx.fillText(label, x, h - padB + 10 * dpr);
+      ctx.globalAlpha = 1;
     }
   }
 
@@ -477,8 +574,10 @@ function renderChart() {
     usedAbove.push(x);
     ctx.font = `${7 * dpr}px sans-serif`;
     ctx.textAlign = 'center';
-    ctx.fillStyle = textColor + '88';
+    ctx.fillStyle = _noteColor(m);
+    ctx.globalAlpha = 0.7;
     ctx.fillText(noteName(info.note, info.octave, _noteStyle, false), x, padT - 5 * dpr);
+    ctx.globalAlpha = 1;
   }
 
   // Current measurement (dashed)
@@ -502,23 +601,31 @@ function drawDataset(ctx, results, color, loMidi, hiMidi, colW, midY, YMAX, padL
     const cents = entry.avg ?? entry;
     const x = padL + (m - loMidi + 0.5) * colW;
     const y = midY - (clamp(cents, -YMAX, YMAX) / YMAX) * (plotH / 2);
-    pts.push({ x, y });
+    pts.push({ x, y, m });
   }
   if (pts.length === 0) return;
 
+  // 接続線: データセット色（現在測定は点線・半透明）
   ctx.strokeStyle = color;
   ctx.lineWidth = (isCurrent ? 1.5 : 2) * dpr;
-  ctx.globalAlpha = isCurrent ? 0.5 : 0.9;
+  ctx.globalAlpha = isCurrent ? 0.4 : 0.7;
   ctx.setLineDash(isCurrent ? [4 * dpr, 3 * dpr] : []);
   ctx.beginPath();
   pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
   ctx.stroke();
   ctx.setLineDash([]);
-  ctx.fillStyle = color;
+
+  // ドット: 音名カラー
+  ctx.globalAlpha = isCurrent ? 0.8 : 1;
   for (const p of pts) {
+    ctx.fillStyle = _noteColor(p.m);
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 4 * dpr, 0, Math.PI * 2);
     ctx.fill();
+    // 白い縁取りで視認性UP
+    ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+    ctx.lineWidth = 1.5 * dpr;
+    ctx.stroke();
   }
   ctx.globalAlpha = 1;
 }
