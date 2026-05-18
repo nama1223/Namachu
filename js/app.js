@@ -22,7 +22,7 @@ function switchTab(name) {
   // Auto-start mic when entering pitch-detection tabs
   if ((name === 'tuner' || name === 'scale' || name === 'record') && !isMicRunning()) {
     startMic(onAudioFrame)
-      .then(() => document.getElementById('micToggleBtn')?.classList.add('active'))
+      .then(() => _setMicActive(true))
       .catch(() => showToast(t('toast_mic_denied')));
   }
 }
@@ -31,15 +31,21 @@ function switchTab(name) {
 let _clarityThreshold = 0.85;
 let _minRms = 0.01;
 
-async function toggleMic() {
+function _setMicActive(active) {
   const btn = document.getElementById('micToggleBtn');
+  const txt = document.getElementById('micStatusText');
+  btn?.classList.toggle('active', active);
+  if (txt) txt.textContent = active ? 'ON' : 'OFF';
+}
+
+async function toggleMic() {
   if (isMicRunning()) {
     stopMic();
-    btn?.classList.remove('active');
+    _setMicActive(false);
   } else {
     try {
       await startMic(onAudioFrame);
-      btn?.classList.add('active');
+      _setMicActive(true);
     } catch (e) {
       showToast(t('toast_mic_denied'));
     }
@@ -121,7 +127,7 @@ function init() {
     if (!isMicRunning()) {
       try {
         await startMic(onAudioFrame);
-        document.getElementById('micToggleBtn')?.classList.add('active');
+        _setMicActive(true);
       } catch (e) {
         showToast(t('toast_mic_denied'));
       }
@@ -131,10 +137,10 @@ function init() {
   setRecordRepairCallback(async () => {
     console.warn('[NamaChu] repair: restarting mic');
     stopMic();
-    document.getElementById('micToggleBtn')?.classList.remove('active');
+    _setMicActive(false);
     try {
       await startMic(onAudioFrame);
-      document.getElementById('micToggleBtn')?.classList.add('active');
+      _setMicActive(true);
     } catch (e) {
       showToast(t('toast_mic_denied'));
     }

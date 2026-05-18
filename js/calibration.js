@@ -288,7 +288,7 @@ function _beginCapture() {
     const timer = document.getElementById('calibTimer');
     if (timer) timer.textContent = `${(tMs / 1000).toFixed(1)}s / ${RECORD_SECONDS}s`;
     const nc = document.getElementById('calibNoteCount');
-    if (nc) nc.textContent = `${liveNoteCount} / 8 音`;
+    if (nc) nc.textContent = `${liveNoteCount} / 8`;
     const meter = document.getElementById('calibMeter');
     if (meter) {
       meter.style.width = Math.min(100, (tMs / (RECORD_SECONDS * 1000)) * 100) + '%';

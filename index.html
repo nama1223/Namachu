@@ -51,7 +51,10 @@
   <div id="tab-tuner" class="tab-content active">
     <div class="header-row">
       <h1 id="appTitle">NamaChu</h1>
-      <button class="mic-btn" id="micToggleBtn" onclick="toggleMic()">🎤</button>
+      <div class="mic-btn-wrap">
+        <button class="mic-btn" id="micToggleBtn" onclick="toggleMic()">🎤</button>
+        <span class="mic-status-text" id="micStatusText">OFF</span>
+      </div>
     </div>
 
     <!-- 上半分: アナログメーター -->
