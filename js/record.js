@@ -106,10 +106,21 @@ function startRecording() {
 function stopRecording() {
   recording = false;
   finalizeCurrentEvent(performance.now());
+  trimLeadingSilence();
   document.getElementById('recBtn')?.classList.remove('recording');
   const totalMs = getTotalDuration();
   updateTimeBar(totalMs, totalMs);
   document.getElementById('playBackBtn').disabled = recordEvents.length === 0;
+}
+
+// 冒頭の無音時間が 1 秒を超える場合、1 秒に揃える
+function trimLeadingSilence() {
+  if (recordEvents.length === 0) return;
+  const firstStart = recordEvents[0].timeMs;
+  if (firstStart > 1000) {
+    const shift = firstStart - 1000;
+    for (const ev of recordEvents) ev.timeMs -= shift;
+  }
 }
 
 function getTotalDuration() {

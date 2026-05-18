@@ -75,11 +75,13 @@ function _renderRecording() {
     <div class="calib-rec-indicator">
       <span class="calib-rec-dot"></span>
       <span id="calibTimer">0.0s / ${RECORD_SECONDS}s</span>
+      <span class="calib-note-count" id="calibNoteCount">0 / 8 音</span>
     </div>
     <div class="calib-meter"><div class="calib-meter-fill" id="calibMeter"></div></div>
   `);
   _setButtons([
     { label: '■ 停止して解析', cls: 'primary', onClick: 'stopCalibrationRecord' },
+    { label: '↻ やり直し',     cls: '',        onClick: 'restartCalibrationRecord' },
     { label: 'キャンセル',     cls: '',        onClick: 'closeCalibration' },
   ]);
 }
@@ -92,13 +94,36 @@ function _renderAnalyzing() {
 
 function _renderDone(best) {
   const ok = best.score > 0;
-  const summary = ok
-    ? `検出ノート数: <b>${best.noteCount}</b> / 8　裏返り: <b>${best.flips}</b> 回　途切れ: <b>${best.gaps}</b><br>
-       推奨設定 → 最小音量: <b>${best.minVolume}</b>　クラリティ: <b>${best.clarity}</b>`
-    : '十分な音が検出できませんでした。もう一度お試しください。';
+  const isPerfect = best.noteCount === 8 && best.flips === 0 && best.gaps === 0;
 
-  _setStatus(ok ? '解析完了！この設定を適用しますか？' : '解析失敗');
-  _setVisual(`<div class="calib-result">${summary}</div>`);
+  // 診断メッセージ
+  const issues = [];
+  if (!ok) {
+    issues.push('音がほとんど検出されませんでした。マイクが入力されているか、音量が足りているか確認してください。');
+  } else {
+    if (best.noteCount < 8) {
+      issues.push(`<b>検出ノートが${best.noteCount}/8</b>: 音が短すぎる／弱すぎる、または各音の間が繋がりすぎている可能性があります。`);
+    } else if (best.noteCount > 8) {
+      issues.push(`<b>検出ノートが${best.noteCount}/8</b>: 同じ音内で揺れが大きく別の音に分割されている可能性。ロングトーンを安定させて再演奏してください。`);
+    }
+    if (best.flips > 0) issues.push(`<b>裏返り${best.flips}回</b>: マイクが倍音を一瞬拾っています。もう少しマイクから離れる／向きを調整すると改善することがあります。`);
+    if (best.gaps > 0) issues.push(`<b>途切れ${best.gaps}回</b>: 連続した音の中に弱くなる瞬間があります。息のコントロールやマイク位置を確認してください。`);
+    if (isPerfect) issues.push('✓ 完璧に検出できました。');
+  }
+
+  const summaryHTML = `
+    <div class="calib-result">
+      <div style="font-size:0.78rem;opacity:0.7;margin-bottom:4px;">※ 数値は36通りのパラメータ組合せで最良だったものです</div>
+      <div>検出ノート数: <b>${best.noteCount}</b> / 8　裏返り: <b>${best.flips}</b> 回　途切れ: <b>${best.gaps}</b> 箇所</div>
+      <div style="margin-top:6px;">推奨設定 → 最小音量: <b>${best.minVolume}</b>　クラリティ: <b>${best.clarity}</b></div>
+      <canvas id="calibTraceCanvas" class="calib-trace" width="600" height="80"></canvas>
+      <div class="calib-issues">${issues.map(s => `<div>・${s}</div>`).join('')}</div>
+    </div>`;
+
+  _setStatus(ok ? '解析完了' : '解析失敗');
+  _setVisual(summaryHTML);
+  _drawTrace(best);
+
   const buttons = [];
   if (ok) buttons.push({ label: '✓ 適用',     cls: 'primary', onClick: 'applyCalibration' });
   buttons.push({ label: '↻ もう一度', cls: '', onClick: 'startCalibrationRecord' });
@@ -107,6 +132,52 @@ function _renderDone(best) {
 
   _state = 'done';
   window._calibBest = best;
+}
+
+// 解析結果のピッチトレースを小さなキャンバスに描画
+function _drawTrace(best) {
+  const canvas = document.getElementById('calibTraceCanvas');
+  if (!canvas || !best.seq) return;
+  const dpr = devicePixelRatio || 1;
+  canvas.width  = canvas.offsetWidth * dpr;
+  canvas.height = canvas.offsetHeight * dpr;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, w, h);
+
+  const seq = best.seq;
+  if (seq.length === 0) return;
+
+  // freq 範囲を求める
+  let lo = Infinity, hi = -Infinity;
+  for (const f of seq) if (f) { if (f < lo) lo = f; if (f > hi) hi = f; }
+  if (!isFinite(lo) || !isFinite(hi) || lo === hi) { hi = lo * 2; }
+  const loMidi = 69 + 12 * Math.log2(lo / 440) - 1;
+  const hiMidi = 69 + 12 * Math.log2(hi / 440) + 1;
+  const range = hiMidi - loMidi;
+
+  const colW = w / seq.length;
+
+  // 途切れ／裏返り箇所のマーカーをまず描画
+  for (const x of (best.gapPositions || [])) {
+    ctx.fillStyle = 'rgba(150,150,150,0.35)';
+    ctx.fillRect(x * colW, 0, Math.max(1, colW), h);
+  }
+
+  // ピッチ点
+  for (let i = 0; i < seq.length; i++) {
+    const f = seq[i];
+    if (!f) continue;
+    const midi = 69 + 12 * Math.log2(f / 440);
+    const y = h - (midi - loMidi) / range * h;
+    const isFlip = (best.flipPositions || []).includes(i);
+    ctx.fillStyle = isFlip ? '#e53935' : '#1e88e5';
+    ctx.beginPath();
+    ctx.arc(i * colW + colW / 2, y, isFlip ? 3 * dpr : 2 * dpr, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 function _setStatus(html) {
@@ -152,20 +223,84 @@ function _beginCapture() {
   _renderRecording();
   _recordStart = performance.now();
 
+  // リアルタイム ノート検出用ステート
+  let liveNoteCount = 0;
+  let liveLastMidi = null;
+  let livePendingMidi = null;
+  let livePendingCount = 0;
+  let liveSilentFrames = 0;
+  const sr = getSampleRate();
+
   setRawFrameCallback((buf, rms) => {
     if (_state !== 'recording') return;
     const tMs = performance.now() - _recordStart;
-    // バッファをコピーして保持
     _frames.push({ buf: new Float32Array(buf), rms, tMs });
 
-    // UI更新（メーター・タイマー）
+    // ---- リアルタイム ノート検出（既定パラメータで判定） ----
+    let detecting = false;
+    if (rms >= 0.012) {
+      const r = yinDetect(buf, sr);
+      if (r.freq && r.clarity >= 0.80) {
+        detecting = true;
+        const midi = Math.round(69 + 12 * Math.log2(r.freq / 440));
+        if (liveLastMidi === null) {
+          // 最初の音
+          if (livePendingMidi === midi) {
+            livePendingCount++;
+            if (livePendingCount >= 3) {
+              liveLastMidi = midi;
+              liveNoteCount = 1;
+              livePendingMidi = null;
+              livePendingCount = 0;
+            }
+          } else { livePendingMidi = midi; livePendingCount = 1; }
+        } else if (midi !== liveLastMidi) {
+          if (livePendingMidi === midi) {
+            livePendingCount++;
+            if (livePendingCount >= 3) {
+              liveLastMidi = midi;
+              liveNoteCount++;
+              livePendingMidi = null;
+              livePendingCount = 0;
+            }
+          } else { livePendingMidi = midi; livePendingCount = 1; }
+        } else {
+          livePendingMidi = null;
+          livePendingCount = 0;
+        }
+        liveSilentFrames = 0;
+      }
+    }
+    if (!detecting) {
+      liveSilentFrames++;
+      livePendingMidi = null;
+      livePendingCount = 0;
+    }
+
+    // ---- UI ----
     const timer = document.getElementById('calibTimer');
     if (timer) timer.textContent = `${(tMs / 1000).toFixed(1)}s / ${RECORD_SECONDS}s`;
+    const nc = document.getElementById('calibNoteCount');
+    if (nc) nc.textContent = `${liveNoteCount} / 8 音`;
     const meter = document.getElementById('calibMeter');
-    if (meter) meter.style.width = Math.min(100, (tMs / (RECORD_SECONDS * 1000)) * 100) + '%';
+    if (meter) {
+      meter.style.width = Math.min(100, (tMs / (RECORD_SECONDS * 1000)) * 100) + '%';
+      meter.style.background = detecting ? '#1e88e5' : 'var(--dot-weak)';
+    }
+
+    // ---- 8音検出後 1秒無音で自動終了 ----
+    if (liveNoteCount >= 8 && liveSilentFrames >= 60) {
+      stopCalibrationRecord();
+    }
   });
 
   _stopTimer = setTimeout(stopCalibrationRecord, RECORD_SECONDS * 1000);
+}
+
+export function restartCalibrationRecord() {
+  _stopCapture();
+  _frames = [];
+  startCalibrationRecord();
 }
 
 export function stopCalibrationRecord() {
@@ -254,31 +389,34 @@ function _scoreSequence(seq) {
     return g[Math.floor(g.length / 2)]; // 中央値
   });
 
-  // 裏返り検出: 全フレームを舐めて、隣接フレーム間で 7 半音以上ジャンプし、
-  // かつそれが 1〜2 フレーム後に元に戻る = 裏返り
+  // 裏返り検出
   let flips = 0;
+  const flipPositions = [];
   for (let i = 1; i < seq.length - 2; i++) {
     if (!seq[i - 1] || !seq[i] || !seq[i + 1]) continue;
     const semisIn = Math.abs(12 * Math.log2(seq[i] / seq[i - 1]));
     const semisBackTo1 = Math.abs(12 * Math.log2(seq[i + 1] / seq[i - 1]));
     const semisBackTo2 = seq[i + 2] ? Math.abs(12 * Math.log2(seq[i + 2] / seq[i - 1])) : 99;
-    if (semisIn >= 6 && (semisBackTo1 <= 3 || semisBackTo2 <= 3)) flips++;
+    if (semisIn >= 6 && (semisBackTo1 <= 3 || semisBackTo2 <= 3)) {
+      flips++;
+      flipPositions.push(i);
+    }
   }
 
-  // 穴検出: 1〜2 フレームの単発 null が前後同じピッチ帯（±3半音）に挟まれている
+  // 穴検出
   let gaps = 0;
+  const gapPositions = [];
   for (let i = 1; i < seq.length - 1; i++) {
     if (seq[i] !== null) continue;
-    // i から null 連続区間を探す
     let j = i;
     while (j < seq.length && seq[j] === null) j++;
     const gapLen = j - i;
-    if (gapLen > 3) { i = j; continue; } // 大きすぎる穴はノート間休符
+    if (gapLen > 3) { i = j; continue; }
     const prev = seq[i - 1];
     const next = seq[j];
     if (prev && next) {
       const semis = Math.abs(12 * Math.log2(next / prev));
-      if (semis <= 3) gaps++;
+      if (semis <= 3) { gaps++; for (let k = i; k < j; k++) gapPositions.push(k); }
     }
     i = j;
   }
@@ -297,7 +435,7 @@ function _scoreSequence(seq) {
   const ascScore = ascRatio * 60;
   const total = noteCountScore + flipScore + gapScore + ascScore + 100;
 
-  return { score: total, noteCount: notes.length, flips, gaps };
+  return { score: total, noteCount: notes.length, flips, gaps, seq, flipPositions, gapPositions };
 }
 
 // ---- 適用 ----

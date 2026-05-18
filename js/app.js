@@ -7,7 +7,7 @@ import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteS
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle } from './record.js';
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset, onScaleInstrumentChange as _scaleInstChange } from './scale.js';
 import { initSettings, getSettings, onInstrumentChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity } from './settings.js';
-import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, applyCalibration } from './calibration.js';
+import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
 
 // ---- Tab management ----
 let _currentTab = 'tuner';
@@ -177,6 +177,7 @@ function exposeGlobals() {
   g.closeCalibration = closeCalibration;
   g.startCalibrationRecord = startCalibrationRecord;
   g.stopCalibrationRecord = stopCalibrationRecord;
+  g.restartCalibrationRecord = restartCalibrationRecord;
   g.applyCalibration = applyCalibration;
 
   // Modal helpers

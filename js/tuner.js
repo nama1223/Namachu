@@ -77,7 +77,7 @@ export function onPitch(freq, clarity, rms) {
   const name = noteName(dispInfo.note, dispInfo.octave, _noteStyle, false);
   const inTune = Math.abs(cents) <= 5;
 
-  pushGraph({ cents, inTune });
+  pushGraph({ cents, inTune, name: name + dispInfo.octave });
   animateNeedleTo(cents);
   updateDisplay(name, dispInfo.octave, cents, freq, inTune);
   updateFullColorBg(cents);
@@ -255,6 +255,40 @@ function drawGraph() {
   const total = Math.min(graphHead, GRAPH_POINTS);
   const colW = w / GRAPH_POINTS;
 
+  const inTuneCol = bgStyle.getPropertyValue('--in-tune-color').trim() || '#4caf50';
+  const sharpCol  = bgStyle.getPropertyValue('--sharp-color').trim()  || '#e53935';
+  const flatCol   = bgStyle.getPropertyValue('--flat-color').trim()   || '#1e88e5';
+  const textCol   = bgStyle.getPropertyValue('--text-color').trim()   || '#333';
+
+  // Note name labels on changes (top of graph)
+  let prevName = null;
+  ctx.font = `bold ${11 * dpr}px sans-serif`;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  for (let i = 0; i < total; i++) {
+    const idx = (graphHead - total + i + GRAPH_POINTS) % GRAPH_POINTS;
+    const pt = graphBuf[idx];
+    if (!pt || !pt.name) { prevName = null; continue; }
+    if (pt.name !== prevName) {
+      const x = i * colW + colW / 2;
+      ctx.fillStyle = textCol;
+      ctx.globalAlpha = 0.8;
+      ctx.fillText(pt.name, x + 2 * dpr, 2 * dpr);
+      ctx.globalAlpha = 1;
+      // tiny vertical tick
+      ctx.strokeStyle = textCol;
+      ctx.globalAlpha = 0.25;
+      ctx.lineWidth = 1 * dpr;
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      prevName = pt.name;
+    }
+  }
+
+  // Pitch dots
   for (let i = 0; i < total; i++) {
     const idx = (graphHead - total + i + GRAPH_POINTS) % GRAPH_POINTS;
     const pt = graphBuf[idx];
@@ -264,10 +298,7 @@ function drawGraph() {
     const cents = Math.max(-50, Math.min(50, pt.cents));
     const y = midY - (cents / 50) * (h / 2 - 4 * dpr);
 
-    const inTune = bgStyle.getPropertyValue('--in-tune-color').trim() || '#4caf50';
-    const sharp = bgStyle.getPropertyValue('--sharp-color').trim() || '#e53935';
-    const flat  = bgStyle.getPropertyValue('--flat-color').trim()  || '#1e88e5';
-    ctx.fillStyle = pt.inTune ? inTune : (cents > 0 ? sharp : flat);
+    ctx.fillStyle = pt.inTune ? inTuneCol : (cents > 0 ? sharpCol : flatCol);
     ctx.beginPath();
     ctx.arc(x + colW / 2, y, 3 * dpr, 0, Math.PI * 2);
     ctx.fill();
@@ -294,24 +325,17 @@ function updateFullColorBg(cents) {
     return;
   }
 
+  // ±0で純白、deviation が増えるほど sharp/flat 色へ濃くブレンド
   const abs = Math.abs(cents);
   const cs = getComputedStyle(document.documentElement);
-  // ブレンド基色は内側カードの --surface-color
-  const bgHex = cs.getPropertyValue('--surface-color').trim();
-  let fgHex, ratio;
+  const baseHex = '#ffffff';
+  const fgHex = cents >= 0
+    ? (cs.getPropertyValue('--sharp-color').trim() || '#e53935')
+    : (cs.getPropertyValue('--flat-color').trim()  || '#1e88e5');
+  // 0¢ → 0% (純白), 50¢ → 75% (かなり濃い)
+  const ratio = Math.min(0.75, (abs / 50) * 0.75);
 
-  if (abs <= 5) {
-    fgHex = cs.getPropertyValue('--in-tune-color').trim() || '#4caf50';
-    ratio = 0.10;
-  } else if (cents > 0) {
-    fgHex = cs.getPropertyValue('--sharp-color').trim() || '#e53935';
-    ratio = Math.min(0.42, (abs - 5) / 45 * 0.42);
-  } else {
-    fgHex = cs.getPropertyValue('--flat-color').trim() || '#1e88e5';
-    ratio = Math.min(0.42, (abs - 5) / 45 * 0.42);
-  }
-
-  const [r, g, b] = blendRgb(bgHex, fgHex, ratio);
+  const [r, g, b] = blendRgb(baseHex, fgHex, ratio);
   const cont = document.querySelector('.container');
   if (cont) cont.style.backgroundColor = `rgb(${r},${g},${b})`;
 }
