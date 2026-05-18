@@ -465,7 +465,7 @@ export function showRecordList() {
   if (!container) return;
   const keys = lsKeys('rec_').sort().reverse();
   if (keys.length === 0) {
-    container.innerHTML = '<p style="opacity:0.6;text-align:center">なし</p>';
+    container.innerHTML = `<p style="opacity:0.6;text-align:center">${t('label_none')}</p>`;
   } else {
     container.innerHTML = keys.map(k => {
       const d = lsGet(k);

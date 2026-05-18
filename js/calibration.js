@@ -9,6 +9,7 @@
 
 import { setRawFrameCallback, getSampleRate, yinDetect, calcRms, isMicRunning, startMic } from './audio.js';
 import { closeModal, openModal, showToast } from './utils.js';
+import { t } from './i18n.js';
 
 const RECORD_SECONDS = 10;
 const FRAME_INTERVAL_MS = 1000 / 60; // 60fps想定
@@ -36,7 +37,7 @@ export function openCalibration() {
 
   // マイクが動いていなければ起動
   if (!isMicRunning()) {
-    startMic(() => {}).catch(() => showToast('マイクを開始できませんでした'));
+    startMic(() => {}).catch(() => showToast(t('calib_mic_start_fail')));
   }
 }
 
@@ -57,39 +58,39 @@ function _resetState() {
 // ---- UI 状態 ----
 
 function _renderIdle() {
-  _setStatus('開始ボタンを押して「4分音符のスラーで1オクターヴの長音階」を演奏してください（約8秒）');
+  _setStatus(t('calib_instruction'));
   _setVisual('');
   _setButtons([
-    { label: '▶ 演奏開始', cls: 'primary', onClick: 'startCalibrationRecord' },
-    { label: '閉じる',    cls: '',        onClick: 'closeCalibration' },
+    { label: t('calib_btn_start_play'), cls: 'primary', onClick: 'startCalibrationRecord' },
+    { label: t('btn_close'),            cls: '',        onClick: 'closeCalibration' },
   ]);
 }
 
 function _renderCountdown(n) {
-  _setStatus('構えてください…');
+  _setStatus(t('calib_ready'));
   _setVisual(`<div class="calib-countdown">${n}</div>`);
-  _setButtons([{ label: 'キャンセル', cls: '', onClick: 'closeCalibration' }]);
+  _setButtons([{ label: t('btn_cancel'), cls: '', onClick: 'closeCalibration' }]);
 }
 
 function _renderRecording() {
-  _setStatus('録音中…ゆっくり明瞭に演奏してください');
+  _setStatus(t('calib_recording_msg'));
   _setVisual(`
     <div class="calib-rec-indicator">
       <span class="calib-rec-dot"></span>
       <span id="calibTimer">0.0s / ${RECORD_SECONDS}s</span>
-      <span class="calib-note-count" id="calibNoteCount">0 / 8 音</span>
+      <span class="calib-note-count" id="calibNoteCount">0 / 8</span>
     </div>
     <div class="calib-meter"><div class="calib-meter-fill" id="calibMeter"></div></div>
   `);
   _setButtons([
-    { label: '■ 停止して解析', cls: 'primary', onClick: 'stopCalibrationRecord' },
-    { label: '↻ やり直し',     cls: '',        onClick: 'restartCalibrationRecord' },
-    { label: 'キャンセル',     cls: '',        onClick: 'closeCalibration' },
+    { label: t('calib_btn_stop_analyze'), cls: 'primary', onClick: 'stopCalibrationRecord' },
+    { label: t('calib_btn_retry'),        cls: '',        onClick: 'restartCalibrationRecord' },
+    { label: t('btn_cancel'),             cls: '',        onClick: 'closeCalibration' },
   ]);
 }
 
 function _renderAnalyzing() {
-  _setStatus('解析中…');
+  _setStatus(t('calib_analyzing_msg'));
   _setVisual('<div class="calib-spinner"></div>');
   _setButtons([]);
 }
@@ -98,39 +99,42 @@ function _renderDone(best) {
   const ok = best.score > 0;
   const isPerfect = best.noteCount === 8 && best.flips === 0 && best.gaps === 0;
 
-  // 診断メッセージ
   const issues = [];
   if (!ok) {
-    issues.push('音がほとんど検出されませんでした。マイクが入力されているか、音量が足りているか確認してください。');
+    issues.push(t('calib_no_sound'));
   } else {
     if (best.noteCount < 8) {
-      issues.push(`<b>検出ノートが${best.noteCount}/8</b>: 音が短すぎる／弱すぎる、または各音の間が繋がりすぎている可能性があります。`);
+      issues.push(t('calib_notes_few').replace('{n}', best.noteCount));
     } else if (best.noteCount > 8) {
-      issues.push(`<b>検出ノートが${best.noteCount}/8</b>: 同じ音内で揺れが大きく別の音に分割されている可能性。ロングトーンを安定させて再演奏してください。`);
+      issues.push(t('calib_notes_many').replace('{n}', best.noteCount));
     }
-    if (best.flips > 0) issues.push(`<b>裏返り${best.flips}回</b>: マイクが倍音を一瞬拾っています。もう少しマイクから離れる／向きを調整すると改善することがあります。`);
-    if (best.gaps > 0) issues.push(`<b>途切れ${best.gaps}回</b>: 連続音の中にピッチ検出失敗があります。${best.silenceGrace >= 160 ? '無音猶予を最大に設定したので、録音側ではある程度補正されます。' : '息のコントロールやマイク位置を確認してください。'}`);
-    if (best.silenceGrace >= 160) issues.push(`スマホ等で発生しやすい短時間ドロップアウト対策として<b>無音猶予 ${best.silenceGrace}ms</b> を適用しています。`);
-    if (isPerfect) issues.push('✓ 完璧に検出できました。');
+    if (best.flips > 0) issues.push(t('calib_flips').replace('{n}', best.flips));
+    if (best.gaps > 0) {
+      const key = best.silenceGrace >= 160 ? 'calib_gaps_grace' : 'calib_gaps';
+      issues.push(t(key).replace('{n}', best.gaps));
+    }
+    if (best.silenceGrace >= 160) issues.push(t('calib_grace_applied').replace('{n}', best.silenceGrace));
+    if (isPerfect) issues.push(t('calib_perfect'));
   }
 
+  const totalCombinations = MIN_VOLUME_GRID.length * CLARITY_GRID.length * SILENCE_GRACE_GRID.length;
   const summaryHTML = `
     <div class="calib-result">
-      <div style="font-size:0.78rem;opacity:0.7;margin-bottom:4px;">※ 数値は ${MIN_VOLUME_GRID.length * CLARITY_GRID.length * SILENCE_GRACE_GRID.length} 通りのパラメータ組合せで最良だったものです</div>
-      <div>検出ノート数: <b>${best.noteCount}</b> / 8　裏返り: <b>${best.flips}</b> 回　途切れ: <b>${best.gaps}</b> 箇所</div>
-      <div style="margin-top:6px;">推奨設定 → 最小音量: <b>${best.minVolume}</b>　クラリティ: <b>${best.clarity}</b>　無音猶予: <b>${best.silenceGrace}</b>ms</div>
+      <div style="font-size:0.78rem;opacity:0.7;margin-bottom:4px;">${t('calib_param_note').replace('{n}', totalCombinations)}</div>
+      <div>${t('calib_result_line').replace('{notes}', best.noteCount).replace('{flips}', best.flips).replace('{gaps}', best.gaps)}</div>
+      <div style="margin-top:6px;">${t('calib_recommended_line').replace('{vol}', best.minVolume).replace('{clar}', best.clarity).replace('{grace}', best.silenceGrace)}</div>
       <canvas id="calibTraceCanvas" class="calib-trace" width="600" height="80"></canvas>
       <div class="calib-issues">${issues.map(s => `<div>・${s}</div>`).join('')}</div>
     </div>`;
 
-  _setStatus(ok ? '解析完了' : '解析失敗');
+  _setStatus(ok ? t('calib_done_ok') : t('calib_done_fail'));
   _setVisual(summaryHTML);
   _drawTrace(best);
 
   const buttons = [];
-  if (ok) buttons.push({ label: '✓ 適用',     cls: 'primary', onClick: 'applyCalibration' });
-  buttons.push({ label: '↻ もう一度', cls: '', onClick: 'startCalibrationRecord' });
-  buttons.push({ label: '閉じる',     cls: '', onClick: 'closeCalibration' });
+  if (ok) buttons.push({ label: t('calib_btn_apply'), cls: 'primary', onClick: 'applyCalibration' });
+  buttons.push({ label: t('calib_btn_again'), cls: '', onClick: 'startCalibrationRecord' });
+  buttons.push({ label: t('btn_close'),       cls: '', onClick: 'closeCalibration' });
   _setButtons(buttons);
 
   _state = 'done';
@@ -203,7 +207,7 @@ function _setButtons(items) {
 
 export function startCalibrationRecord() {
   if (!isMicRunning()) {
-    showToast('マイクが起動していません');
+    showToast(t('calib_mic_off'));
     return;
   }
   _frames = [];
@@ -548,6 +552,6 @@ export function applyCalibration() {
   const best = window._calibBest;
   if (!best) return;
   _onApply?.(best.minVolume, best.clarity, best.silenceGrace);
-  showToast('感度設定を適用しました');
+  showToast(t('calib_applied'));
   closeCalibration();
 }

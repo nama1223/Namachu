@@ -144,7 +144,7 @@ function updateInstrumentInfo() {
   const transEl = document.getElementById('transpositionLabel');
   if (transEl) {
     const semi = inst.trans;
-    transEl.textContent = semi === 0 ? 'C (concert)' : `${semi > 0 ? '+' : ''}${semi} 半音`;
+    transEl.textContent = semi === 0 ? 'C (concert)' : `${semi > 0 ? '+' : ''}${semi} ${t('label_semitone')}`;
   }
 
   const rangeEl = document.getElementById('rangeLabel');
@@ -206,12 +206,12 @@ export async function refreshMicDevices() {
     const devices = await getMicDevices();
     const current = _settings.micDeviceId;
     sel.innerHTML = [
-      `<option value="">（デフォルト）</option>`,
+      `<option value="">${t('label_mic_default')}</option>`,
       ...devices.map(d => `<option value="${d.deviceId}">${d.label}</option>`)
     ].join('');
     sel.value = current || '';
   } catch {
-    sel.innerHTML = `<option value="">（取得失敗）</option>`;
+    sel.innerHTML = `<option value="">${t('label_mic_error')}</option>`;
   }
 }
 
@@ -375,12 +375,12 @@ function updateCardSummaries() {
   const instName = lang === 'ja' ? inst.nameJa : inst.nameEn;
   const dt = getDisplayTrans();
   const dtName = lang === 'ja' ? dt.nameJa : dt.nameEn;
-  const noteStyleLabel = _settings.noteStyle === 'do' ? 'ドレミ' : 'CDEFG';
+  const noteStyleLabel = _settings.noteStyle === 'do' ? t('label_solfege') : 'CDEFG';
 
   _setSummary('summary-instrument', instName);
   _setSummary('summary-pitch', `A = ${_settings.concertPitch} Hz`);
   _setSummary('summary-notestyle', `${noteStyleLabel} / ${dtName}`);
-  _setSummary('summary-sensitivity', `音量 ${_settings.minVolume} / クラリティ ${_settings.clarity}`);
+  _setSummary('summary-sensitivity', `${t('label_vol_short')} ${_settings.minVolume} / ${t('label_clarity_short')} ${_settings.clarity}`);
 }
 
 function _setSummary(id, text) {
@@ -392,6 +392,16 @@ export function minVolumeToRms(v) { return v / 100 * 0.15; }
 export function clarityToThreshold(v) { return v / 100; }
 
 export function getSilenceGrace() { return _settings.silenceGrace ?? 100; }
+
+// 言語切り替え後に動的コンテンツを再構築
+export function refreshSettingsUI() {
+  populateInstrumentSelect();
+  populateDisplayTransSelect();
+  buildThemeGrid();
+  updateInstrumentInfo();
+  updateCardSummaries();
+  refreshMicDevices(); // async, fire-and-forget
+}
 
 // ---- 自動校正からの設定適用 ----
 export function applyCalibratedSensitivity(minVolume, clarity, silenceGrace) {

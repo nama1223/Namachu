@@ -6,7 +6,7 @@ import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold, resume
 import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, toggleFullColor } from './tuner.js';
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook } from './record.js';
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset, switchScaleView } from './scale.js';
-import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace } from './settings.js';
+import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI } from './settings.js';
 import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
 
 // ---- Tab management ----
@@ -155,7 +155,7 @@ function exposeGlobals() {
   g.switchTab = switchTab;
   g.toggleMic = toggleMic;
   g.toggleFullColor = toggleFullColor;
-  g.setLang = (lang) => { setLang(lang); applyI18n(); };
+  g.setLang = (lang) => { setLang(lang); applyI18n(); refreshSettingsUI(); };
 
   // Settings tab
   g.onFamilyChange = onFamilyChange;

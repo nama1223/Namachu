@@ -314,7 +314,7 @@ function renderDataList() {
   const el = document.getElementById('scaleDataList');
   if (!el) return;
   if (savedDatasets.length === 0) {
-    el.innerHTML = '<p style="font-size:0.8rem;opacity:0.6">なし</p>';
+    el.innerHTML = `<p style="font-size:0.8rem;opacity:0.6">${t('label_none')}</p>`;
     return;
   }
   el.innerHTML = savedDatasets.map((ds, i) => `
