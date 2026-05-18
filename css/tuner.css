@@ -54,6 +54,10 @@
   stroke: var(--text-color);
   opacity: 0.5;
 }
+.just-third-mark {
+  fill: #e53935;
+  opacity: 0.85;
+}
 .meter-ticks line.major {
   opacity: 1;
   stroke-width: 2;
@@ -163,6 +167,29 @@
   cursor: pointer;
   opacity: 0.8;
 }
+.tuner-footer-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .concert-pitch-badge {
   opacity: 0.6;
+}
+.full-color-btn {
+  font-size: 0.70rem;
+  font-weight: bold;
+  padding: 3px 9px;
+  border: 1px solid var(--dot-weak);
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text-color);
+  opacity: 0.55;
+  transition: opacity 0.15s, background 0.15s, color 0.15s;
+}
+.full-color-btn.active,
+.full-color-btn[data-on="1"] {
+  background: var(--primary-color) !important;
+  color: #fff !important;
+  border-color: var(--primary-color) !important;
+  opacity: 1 !important;
 }

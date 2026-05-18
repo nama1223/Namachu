@@ -1,0 +1,12 @@
+{
+  "name": "NamaTune",
+  "short_name": "NamaTune",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#FFA145",
+  "theme_color": "#FFA145",
+  "icons": [
+    {"src": "NamaTuneLogo192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "NamaTuneLogo512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}

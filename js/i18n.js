@@ -25,6 +25,9 @@ export const STRINGS = {
     label_range: '音域',
     label_concert_pitch: 'コンサートピッチ',
     label_note_name_style: '音名表記',
+    label_display_trans: '表示移調',
+    label_mic_input: 'マイク入力',
+    label_mic_refresh: '更新',
     label_theme: 'テーマ',
     label_mic_sensitivity: 'マイク感度 / 閾値',
     label_min_volume: '最小音量',
@@ -49,6 +52,9 @@ export const STRINGS = {
     toast_deleted: '削除しました',
     toast_mic_denied: 'マイクへのアクセスが拒否されました',
     toast_export_done: 'エクスポートしました',
+    help_mic_title: 'マイク感度について',
+    help_mic_body_min: '最小音量: 小さな音を無視するための閾値。環境ノイズが多い場合は上げてください。低すぎるとノイズを音として拾います。',
+    help_mic_body_clarity: 'クラリティ閾値: 音程の信頼度。高いほど確実な音程のみ表示します。低すぎると不安定な検出が増えます。',
   },
   en: {
     app_title: 'NamaTune',
@@ -74,6 +80,9 @@ export const STRINGS = {
     label_range: 'Range',
     label_concert_pitch: 'Concert Pitch',
     label_note_name_style: 'Note Names',
+    label_display_trans: 'Display Transposition',
+    label_mic_input: 'Microphone',
+    label_mic_refresh: 'Refresh',
     label_theme: 'Theme',
     label_mic_sensitivity: 'Mic Sensitivity / Threshold',
     label_min_volume: 'Min Volume',
@@ -98,6 +107,9 @@ export const STRINGS = {
     toast_deleted: 'Deleted',
     toast_mic_denied: 'Microphone access denied',
     toast_export_done: 'Exported',
+    help_mic_title: 'Microphone Sensitivity',
+    help_mic_body_min: 'Min Volume: threshold to ignore quiet sounds. Increase if ambient noise is picked up. Too low = noise detected as pitch.',
+    help_mic_body_clarity: 'Clarity Threshold: pitch confidence level. Higher = only stable pitches shown. Too low = unstable detections increase.',
   }
 };
 

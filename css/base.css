@@ -64,15 +64,35 @@ button {
 }
 #toastMsg.show { opacity: 1; }
 
-/* ---- Lang selector ---- */
-.lang-selector-outer {
+/* ---- App footer ---- */
+.app-footer {
   display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 8px;
-  padding: 10px 0 6px;
+  padding: 14px 0 10px;
   width: 95%;
   max-width: 450px;
+  border-top: 1px solid var(--dot-weak);
+  margin-top: 6px;
 }
+.footer-lang {
+  display: flex;
+  gap: 8px;
+}
+.footer-credit {
+  font-size: 0.72rem;
+  opacity: 0.5;
+}
+.footer-wishlist {
+  font-size: 0.72rem;
+  color: var(--primary-color);
+  text-decoration: none;
+  opacity: 0.7;
+}
+.footer-wishlist:hover { opacity: 1; }
+
+/* ---- Lang button ---- */
 .lang-btn {
   background: transparent;
   color: var(--text-color);
@@ -112,21 +132,76 @@ button {
   justify-content: center;
 }
 
-/* ---- Setting cards ---- */
+/* ---- Setting cards (accordion) ---- */
 .setting-card {
   background: var(--bg-color);
   border-radius: 12px;
-  padding: 12px;
   margin-bottom: 10px;
   border: 1px solid var(--dot-weak);
+  overflow: hidden;
+}
+.setting-card-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px;
+  cursor: pointer;
+  user-select: none;
+}
+.setting-card-header:hover { opacity: 0.85; }
+.setting-card-title-wrap {
+  flex: 1;
+  min-width: 0;
 }
 .setting-card-title {
+  display: block;
   font-size: 0.8rem;
   font-weight: bold;
   opacity: 0.7;
-  margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+}
+.card-summary {
+  display: none;
+  font-size: 0.72rem;
+  opacity: 0.65;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.setting-card.collapsed .card-summary { display: block; }
+.card-arrow {
+  font-size: 0.65rem;
+  opacity: 0.5;
+  transition: transform 0.2s;
+}
+.setting-card.collapsed .card-arrow {
+  transform: rotate(-90deg);
+}
+.setting-card-body {
+  padding: 0 12px 12px;
+  overflow: hidden;
+  max-height: 600px;
+  transition: max-height 0.3s ease, padding 0.3s ease;
+}
+.setting-card.collapsed .setting-card-body {
+  max-height: 0;
+  padding-bottom: 0;
+}
+.help-btn {
+  background: transparent;
+  border: 1px solid var(--dot-weak);
+  color: var(--text-color);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  font-size: 0.7rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
 }
 .setting-row {
   display: flex;

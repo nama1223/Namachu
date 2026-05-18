@@ -3,10 +3,10 @@
 import { initI18n, setLang, applyI18n, t } from './i18n.js';
 import { showToast, closeModal, openModal, getInstrument, lsSet } from './utils.js';
 import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold } from './audio.js';
-import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold } from './tuner.js';
+import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, toggleFullColor } from './tuner.js';
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle } from './record.js';
-import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, onScaleInstrumentChange as _scaleInstChange } from './scale.js';
-import { initSettings, getSettings, onInstrumentChange, adjustConcertPitch, onNoteStyleChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold } from './settings.js';
+import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset, onScaleInstrumentChange as _scaleInstChange } from './scale.js';
+import { initSettings, getSettings, onInstrumentChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard } from './settings.js';
 
 // ---- Tab management ----
 let _currentTab = 'tuner';
@@ -17,6 +17,13 @@ function switchTab(name) {
   document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
   document.getElementById('tab-' + name)?.classList.add('active');
   document.getElementById('tabBtn-' + name)?.classList.add('active');
+
+  // Auto-start mic when entering pitch-detection tabs
+  if ((name === 'tuner' || name === 'scale') && !isMicRunning()) {
+    startMic(onAudioFrame)
+      .then(() => document.getElementById('micToggleBtn')?.classList.add('active'))
+      .catch(() => showToast(t('toast_mic_denied')));
+  }
 }
 
 // ---- Mic toggle ----
@@ -60,6 +67,7 @@ function onSettingsChange(s) {
   setTunerNoteStyle(ns);
   setTunerInstrument(inst);
   setTunerClarityThreshold(_clarityThreshold);
+  setTunerDisplayTrans(getDisplayTrans().trans);
 
   setRecordConcertPitch(cp);
   setRecordNoteStyle(ns);
@@ -88,6 +96,7 @@ function init() {
     noteStyle: s.noteStyle,
     instrument: inst,
     clarityThreshold: clarityToThreshold(s.clarity),
+    displayTrans: getDisplayTrans().trans,
   });
 
   initRecord({
@@ -114,12 +123,18 @@ function exposeGlobals() {
   const g = window;
   g.switchTab = switchTab;
   g.toggleMic = toggleMic;
+  g.toggleFullColor = toggleFullColor;
   g.setLang = (lang) => { setLang(lang); applyI18n(); };
 
   // Settings tab
   g.onInstrumentChange = onInstrumentChange;
   g.adjustConcertPitch = adjustConcertPitch;
   g.onNoteStyleChange = onNoteStyleChange;
+  g.onDisplayTransChange = onDisplayTransChange;
+  g.onMicDeviceChange = onMicDeviceChange;
+  g.refreshMicDevices = refreshMicDevices;
+  g.toggleCard = toggleCard;
+  g.openModal = openModal;
   g.onMinVolumeChange = onMinVolumeChange;
   g.onClarityChange = onClarityChange;
   g.exportAllData = exportAllData;
@@ -143,6 +158,7 @@ function exposeGlobals() {
   g.clearScaleData = clearScaleData;
   g.exportScaleData = exportScaleData;
   g.deleteDataset = deleteDataset;
+  g.confirmScaleDataset = confirmScaleDataset;
   g.onScaleInstrumentChange = () => {
     const sel = document.getElementById('scaleMeasureInstrument');
     if (sel) {

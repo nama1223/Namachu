@@ -3,10 +3,12 @@
 import { freqToMidi, midiToNoteInfo, noteName } from './utils.js';
 
 // ---- State ----
-let _concertPitch = 440;
+let _concertPitch = 442;
 let _noteStyle = 'abc';
-let _instrument = null; // instrument object
+let _instrument = null;
+let _displayTrans = 0; // semitones: displayMidi = concertMidi - _displayTrans
 let _clarityThreshold = 0.85;
+let _fullColorEnabled = false;
 
 // Time-graph circular buffer
 const GRAPH_SECONDS = 10;
@@ -27,6 +29,7 @@ export function initTuner(opts = {}) {
   _noteStyle = opts.noteStyle ?? 'abc';
   _instrument = opts.instrument ?? null;
   _clarityThreshold = opts.clarityThreshold ?? 0.85;
+  _displayTrans = opts.displayTrans ?? 0;
 
   buildMeterTicks();
   initTimeGraph();
@@ -36,7 +39,23 @@ export function initTuner(opts = {}) {
 export function setTunerConcertPitch(hz) { _concertPitch = hz; }
 export function setTunerNoteStyle(s) { _noteStyle = s; }
 export function setTunerInstrument(inst) { _instrument = inst; }
+export function setTunerDisplayTrans(semitones) { _displayTrans = semitones; }
 export function setTunerClarityThreshold(v) { _clarityThreshold = v; }
+
+export function toggleFullColor() {
+  _fullColorEnabled = !_fullColorEnabled;
+  const btn = document.getElementById('fullColorBtn');
+  if (btn) {
+    btn.classList.toggle('active', _fullColorEnabled);
+    btn.dataset.on = _fullColorEnabled ? '1' : '0';
+  }
+  if (!_fullColorEnabled) _clearFullColorBg();
+}
+
+function _clearFullColorBg() {
+  const cont = document.querySelector('.container');
+  if (cont) cont.style.backgroundColor = '';
+}
 
 // ---- Called each audio frame ----
 export function onPitch(freq, clarity, rms) {
@@ -44,15 +63,15 @@ export function onPitch(freq, clarity, rms) {
     pushGraph(null);
     animateNeedleTo(0);
     setDisplaySilent();
+    updateFullColorBg(null);
     return;
   }
 
   const midi = freqToMidi(freq, _concertPitch);
-  const { note, octave, cents } = midiToNoteInfo(midi);
+  const { cents } = midiToNoteInfo(midi);
 
-  // Account for instrument transposition: display written pitch
-  let displayMidi = midi;
-  if (_instrument?.trans) displayMidi = midi - _instrument.trans;
+  // Apply display transposition (written pitch for transposing instruments)
+  const displayMidi = midi - _displayTrans;
   const dispInfo = midiToNoteInfo(displayMidi);
 
   const name = noteName(dispInfo.note, dispInfo.octave, _noteStyle, false);
@@ -61,6 +80,7 @@ export function onPitch(freq, clarity, rms) {
   pushGraph({ cents, inTune });
   animateNeedleTo(cents);
   updateDisplay(name, dispInfo.octave, cents, freq, inTune);
+  updateFullColorBg(cents);
 }
 
 // ---- Meter needle ----
@@ -74,7 +94,7 @@ function buildMeterTicks() {
   // 0¢ = angle 0 (pointing up from pivot at 150,150)
   // ±50¢ = ±65°
   const cx = 150, cy = 150, r = 120;
-  const minAngle = -65, maxAngle = 65;
+  const maxAngle = 65;
 
   for (let c = -50; c <= 50; c += 5) {
     const angle = (c / 50) * maxAngle * (Math.PI / 180);
@@ -94,6 +114,27 @@ function buildMeterTicks() {
     if (isCenter) line.classList.add('center');
     else if (isMajor) line.classList.add('major');
     g.appendChild(line);
+  }
+
+  // Pure intonation third markers (triangles pointing inward)
+  // Major 3rd below root: -13.7¢  Minor 3rd above root: +15.6¢
+  const thirdCents = [-13.7, 15.6];
+  for (const c of thirdCents) {
+    const aRad = (c / 50) * maxAngle * (Math.PI / 180);
+    const sinA = Math.sin(aRad), cosA = Math.cos(aRad);
+    // Tip: 14px inward from arc
+    const tx = (cx + sinA * (r - 14)).toFixed(1);
+    const ty = (cy - cosA * (r - 14)).toFixed(1);
+    // Base: on the arc, ±5px tangential
+    const ox = cx + sinA * r, oy = cy - cosA * r;
+    const b1x = (ox + cosA * 5).toFixed(1);
+    const b1y = (oy + sinA * 5).toFixed(1);
+    const b2x = (ox - cosA * 5).toFixed(1);
+    const b2y = (oy - sinA * 5).toFixed(1);
+    const tri = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+    tri.setAttribute('points', `${tx},${ty} ${b1x},${b1y} ${b2x},${b2y}`);
+    tri.classList.add('just-third-mark');
+    g.appendChild(tri);
   }
 }
 
@@ -231,6 +272,48 @@ function drawGraph() {
     ctx.arc(x + colW / 2, y, 3 * dpr, 0, Math.PI * 2);
     ctx.fill();
   }
+}
+
+// ---- Full-color background ----
+function hexToRgb(hex) {
+  const h = hex.replace(/^#/, '');
+  const full = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+  return [parseInt(full.slice(0,2),16), parseInt(full.slice(2,4),16), parseInt(full.slice(4,6),16)];
+}
+
+function blendRgb(bgHex, fgHex, ratio) {
+  const bg = hexToRgb(bgHex || '#dccaaf');
+  const fg = hexToRgb(fgHex || '#888888');
+  return bg.map((b, i) => Math.round(b * (1 - ratio) + fg[i] * ratio));
+}
+
+function updateFullColorBg(cents) {
+  const onTunerTab = document.getElementById('tab-tuner')?.classList.contains('active');
+  if (!_fullColorEnabled || !onTunerTab || cents === null) {
+    _clearFullColorBg();
+    return;
+  }
+
+  const abs = Math.abs(cents);
+  const cs = getComputedStyle(document.documentElement);
+  // ブレンド基色は内側カードの --surface-color
+  const bgHex = cs.getPropertyValue('--surface-color').trim();
+  let fgHex, ratio;
+
+  if (abs <= 5) {
+    fgHex = cs.getPropertyValue('--in-tune-color').trim() || '#4caf50';
+    ratio = 0.10;
+  } else if (cents > 0) {
+    fgHex = cs.getPropertyValue('--sharp-color').trim() || '#e53935';
+    ratio = Math.min(0.42, (abs - 5) / 45 * 0.42);
+  } else {
+    fgHex = cs.getPropertyValue('--flat-color').trim() || '#1e88e5';
+    ratio = Math.min(0.42, (abs - 5) / 45 * 0.42);
+  }
+
+  const [r, g, b] = blendRgb(bgHex, fgHex, ratio);
+  const cont = document.querySelector('.container');
+  if (cont) cont.style.backgroundColor = `rgb(${r},${g},${b})`;
 }
 
 export function stopGraphLoop() {

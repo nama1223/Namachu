@@ -4,6 +4,11 @@ import { freqToMidi, midiToNoteInfo, noteName, clamp, formatTime, defaultSaveNam
 import { playSynthSequence } from './audio.js';
 import { t } from './i18n.js';
 
+// ---- Constants ----
+const MIN_NOTE_MS        = 25;   // 最小音符長（16分音符三連符 tempo170 ≈ 59ms に対応）
+const OCTAVE_REJECT_SEMIS = 7;   // これ以上のセミトーン差は オクターヴ誤検出とみなし棄却
+const FREQ_EMA_ALPHA     = 0.35; // 周波数EMAの追跡速度（高=速）
+
 // ---- State ----
 let _instrument = null;
 let _concertPitch = 440;
@@ -13,22 +18,26 @@ let recording = false;
 let playing = false;
 let recordStartTime = 0;
 
-// Each event: { timeMs, freq, midi, cents, durationMs }
+// Each event: { timeMs, freq, midi, note, octave, cents, durationMs, freqSamples }
 let recordEvents = [];
 let _lastFreq = null;
 let _lastEventStart = 0;
+let _freqSamples = [];    // [{offsetMs, freq}] for current ongoing note
 let _currentSynthHandle = null;
 let _playbackTimer = null;
+
+// ---- Pitch sanity state ----
+let _freqEma = null; // 周波数の指数移動平均（オクターヴ補正用）
 
 // Canvas
 let canvas = null;
 let ctx = null;
 let rafId = null;
 
-// Scroll position (ms shown at left edge)
 let scrollMs = 0;
-const SCROLL_SPEED_PX_PER_MS = 0.05; // pixels per ms at default zoom
-let viewMs = 8000; // ms visible in canvas
+let viewMs = 8000;
+
+const BLACK_KEYS = new Set([1, 3, 6, 8, 10]);
 
 export function initRecord(opts = {}) {
   _instrument = opts.instrument ?? null;
@@ -44,12 +53,9 @@ export function initRecord(opts = {}) {
   startDrawLoop();
 }
 
-export function setRecordInstrument(inst) {
-  _instrument = inst;
-  buildPitchAxis();
-}
+export function setRecordInstrument(inst) { _instrument = inst; buildPitchAxis(); }
 export function setRecordConcertPitch(hz) { _concertPitch = hz; }
-export function setRecordNoteStyle(s) { _noteStyle = s; }
+export function setRecordNoteStyle(s) { _noteStyle = s; buildPitchAxis(); }
 
 function resizeCanvas() {
   if (!canvas) return;
@@ -57,21 +63,21 @@ function resizeCanvas() {
   canvas.height = canvas.offsetHeight * devicePixelRatio;
 }
 
-// ---- Pitch axis labels ----
+// ---- Pitch axis labels (chromatic) ----
 function buildPitchAxis() {
   const el = document.getElementById('recordPitchAxis');
   if (!el || !_instrument) return;
-  const notes = [];
+  const spans = [];
   for (let m = _instrument.hiMidi; m >= _instrument.loMidi; m--) {
     const info = midiToNoteInfo(m);
-    // show natural notes only to avoid clutter
-    if ([0,2,4,5,7,9,11].includes(info.note)) {
-      notes.push(noteName(info.note, info.octave, _noteStyle, false));
-    } else {
-      notes.push('');
-    }
+    const isBlack = BLACK_KEYS.has(info.note);
+    // Only label C notes to avoid crowding
+    const label = (!isBlack && info.note === 0)
+      ? noteName(info.note, info.octave, _noteStyle, true)
+      : '';
+    spans.push(`<span class="${isBlack ? 'axis-black' : 'axis-white'}">${label}</span>`);
   }
-  el.innerHTML = notes.map(n => `<span>${n}</span>`).join('');
+  el.innerHTML = spans.join('');
 }
 
 // ---- Recording ----
@@ -87,60 +93,115 @@ function startRecording() {
   recordStartTime = performance.now();
   scrollMs = 0;
   _lastFreq = null;
+  _freqSamples = [];
+  _freqEma = null;
   document.getElementById('recBtn')?.classList.add('recording');
   document.getElementById('playBackBtn').disabled = true;
-  updateTimeBar();
+  updateTimeBar(0, 0);
 }
 
 function stopRecording() {
   recording = false;
   finalizeCurrentEvent(performance.now());
   document.getElementById('recBtn')?.classList.remove('recording');
+  const totalMs = getTotalDuration();
+  updateTimeBar(totalMs, totalMs);
   document.getElementById('playBackBtn').disabled = recordEvents.length === 0;
 }
 
-/** Called from audio pipeline each frame while recording */
+function getTotalDuration() {
+  return recordEvents.reduce((max, e) => Math.max(max, e.timeMs + e.durationMs), 0);
+}
+
+// ---- オクターヴ誤検出フィルタ＆補正 ----
+// EMAからオクターヴ分ずれている場合は2^N で除して補正を試みる。
+// 補正後も大きくずれる場合は棄却する。
+function sanitizeFreq(freq) {
+  if (_freqEma === null) { _freqEma = freq; return freq; }
+  const ratio = freq / _freqEma;
+  const octaves = Math.round(Math.log2(ratio));
+  if (octaves !== 0) {
+    const corrected = freq / Math.pow(2, octaves);
+    const correctedSemis = Math.abs(12 * Math.log2(corrected / _freqEma));
+    if (correctedSemis <= 4) {
+      freq = corrected; // オクターヴ誤検出を修正
+    } else if (Math.abs(12 * Math.log2(freq / _freqEma)) > OCTAVE_REJECT_SEMIS) {
+      return null; // 補正できない → 棄却
+    }
+  }
+  _freqEma = _freqEma * Math.pow(freq / _freqEma, FREQ_EMA_ALPHA);
+  return freq;
+}
+
 export function onRecordPitch(freq, clarity, clarityThreshold) {
   if (!recording) return;
   const now = performance.now();
   const timeMs = now - recordStartTime;
 
-  const valid = freq && clarity >= clarityThreshold;
-
-  if (valid) {
-    const midi = freqToMidi(freq, _concertPitch);
-    const info = midiToNoteInfo(midi);
-    if (_lastFreq === null) {
-      _lastEventStart = timeMs;
-    }
-    _lastFreq = freq;
-    // auto-scroll
-    scrollMs = Math.max(0, timeMs - viewMs * 0.75);
-  } else {
+  // --- 無音判定 ---
+  if (!freq || clarity < clarityThreshold) {
+    _freqEma = null;
     if (_lastFreq !== null) finalizeCurrentEvent(now);
     _lastFreq = null;
+    _freqSamples = [];
+    updateTimeBar(timeMs, timeMs);
+    return;
   }
 
-  updateTimeBar();
+  // --- オクターヴ誤検出フィルタ＆補正 ---
+  const safeFreq = sanitizeFreq(freq);
+  if (safeFreq === null) {
+    // このフレームは棄却（音符は継続扱い）
+    updateTimeBar(timeMs, timeMs);
+    return;
+  }
+
+  // --- 有効サンプル処理 ---
+  if (_lastFreq === null) {
+    // 無音後の新規音符開始
+    _lastEventStart = timeMs;
+    _freqSamples = [];
+  }
+
+  _lastFreq = safeFreq;
+  _freqSamples.push({ offsetMs: timeMs - _lastEventStart, freq: safeFreq });
+  scrollMs = Math.max(0, timeMs - viewMs * 0.75);
+  updateTimeBar(timeMs, timeMs);
 }
 
 function finalizeCurrentEvent(now) {
-  if (_lastFreq === null) return;
+  if (_lastFreq === null || _freqSamples.length === 0) {
+    _lastFreq = null;
+    _freqSamples = [];
+    return;
+  }
   const timeMs = now - recordStartTime;
   const dur = timeMs - _lastEventStart;
-  if (dur < 80) return; // discard very short blips
-  const midi = freqToMidi(_lastFreq, _concertPitch);
-  const info = midiToNoteInfo(midi);
+  if (dur < MIN_NOTE_MS) { _lastFreq = null; _freqSamples = []; return; }
+
+  // 最頻MIDIノート（mode）でレーン位置を決定（スラー含む場合の誤配置を防ぐ）
+  const midiCounts = {};
+  _freqSamples.forEach(s => {
+    const m = Math.round(freqToMidi(s.freq, _concertPitch));
+    midiCounts[m] = (midiCounts[m] || 0) + 1;
+  });
+  const modeMidi = +Object.keys(midiCounts).reduce((a, b) =>
+    midiCounts[a] > midiCounts[b] ? a : b
+  );
+  const info = midiToNoteInfo(modeMidi);
+
   recordEvents.push({
     timeMs: _lastEventStart,
     freq: _lastFreq,
-    midi,
+    midi: modeMidi,
     note: info.note,
     octave: info.octave,
     cents: info.cents,
     durationMs: dur,
+    freqSamples: [..._freqSamples],
   });
   _lastFreq = null;
+  _freqSamples = [];
 }
 
 // ---- Playback ----
@@ -159,8 +220,8 @@ function startPlayback() {
 
   _currentSynthHandle = playSynthSequence(recordEvents, onPlaybackEnd);
 
-  const totalMs = recordEvents.reduce((max, e) => Math.max(max, e.timeMs + e.durationMs), 0);
-  let startWall = performance.now();
+  const totalMs = getTotalDuration();
+  const startWall = performance.now();
 
   function tick() {
     if (!playing) return;
@@ -181,6 +242,8 @@ function onPlaybackEnd() {
   const span = document.querySelector('#playBackBtn span');
   if (span) span.textContent = t('btn_play');
   document.getElementById('recBtn').disabled = false;
+  const totalMs = getTotalDuration();
+  updateTimeBar(totalMs, totalMs);
 }
 
 function stopPlayback() {
@@ -191,11 +254,14 @@ function stopPlayback() {
 // ---- Clear ----
 export function clearRecording() {
   stopPlayback();
-  stopRecording();
+  if (recording) stopRecording();
   recordEvents = [];
   scrollMs = 0;
+  _lastFreq = null;
+  _freqSamples = [];
+  _freqEma = null;
   document.getElementById('playBackBtn').disabled = true;
-  updateTimeBar();
+  updateTimeBar(0, 0);
 }
 
 // ---- Time bar ----
@@ -210,9 +276,8 @@ function updateTimeBar(currentMs = 0, totalMs = 0) {
 // ---- Save / Load ----
 export function saveRecording() {
   if (recordEvents.length === 0) return;
-  const defName = defaultSaveName();
   const input = document.getElementById('saveNameInput');
-  if (input) input.value = defName;
+  if (input) input.value = defaultSaveName();
   openModal('saveNameModal');
 }
 
@@ -242,7 +307,7 @@ export function showRecordList() {
       if (!d) return '';
       const dateStr = d.savedAt ? new Date(d.savedAt).toLocaleString() : '';
       return `<div class="record-item">
-        <div>
+        <div style="flex:1;min-width:0">
           <div class="record-item-name">${d.name || k}</div>
           <div class="record-item-date">${dateStr}</div>
         </div>
@@ -264,6 +329,8 @@ export function loadRecording(key) {
   recordEvents = data.events || [];
   scrollMs = 0;
   document.getElementById('playBackBtn').disabled = recordEvents.length === 0;
+  const totalMs = getTotalDuration();
+  updateTimeBar(totalMs, totalMs);
   hideRecordList();
   showToast(t('toast_loaded'));
 }
@@ -286,12 +353,15 @@ function startDrawLoop() {
 
 function drawCanvas() {
   if (!ctx || !canvas || !_instrument) return;
+  if (canvas.width === 0 || canvas.height === 0) {
+    resizeCanvas();
+    if (canvas.width === 0) return;
+  }
   const w = canvas.width;
   const h = canvas.height;
   const dpr = devicePixelRatio;
   const style = getComputedStyle(document.documentElement);
 
-  // Background
   ctx.fillStyle = style.getPropertyValue('--bg-color').trim();
   ctx.fillRect(0, 0, w, h);
 
@@ -300,71 +370,84 @@ function drawCanvas() {
   const noteRange = hiMidi - loMidi + 1;
   const laneH = h / noteRange;
 
-  // Note lane backgrounds (alternating)
+  const surfaceColor = style.getPropertyValue('--surface-color').trim();
+  const dotBg        = style.getPropertyValue('--dot-bg').trim();
+  const dotWeak      = style.getPropertyValue('--dot-weak').trim();
+  const textColor    = style.getPropertyValue('--text-color').trim();
+
+  // Lane backgrounds
   for (let m = loMidi; m <= hiMidi; m++) {
     const laneY = h - (m - loMidi + 1) * laneH;
     const info = midiToNoteInfo(m);
-    const isBlack = [1,3,6,8,10].includes(info.note);
-    ctx.fillStyle = isBlack
-      ? style.getPropertyValue('--dot-bg').trim()
-      : style.getPropertyValue('--surface-color').trim();
+    const isBlack = BLACK_KEYS.has(info.note);
+    ctx.fillStyle = isBlack ? dotBg : surfaceColor;
     ctx.fillRect(0, laneY, w, laneH);
-
-    // Lane separator
-    ctx.strokeStyle = style.getPropertyValue('--dot-weak').trim();
-    ctx.lineWidth = 0.5 * dpr;
+    ctx.strokeStyle = info.note === 0 ? textColor : dotWeak;
+    ctx.lineWidth = (info.note === 0 ? 1.5 : 0.5) * dpr;
     ctx.beginPath();
     ctx.moveTo(0, laneY + laneH);
     ctx.lineTo(w, laneY + laneH);
     ctx.stroke();
   }
 
-  // Events
   const msPerPx = viewMs / w;
-  const inTuneColor = style.getPropertyValue('--in-tune-color').trim();
-  const sharpColor  = style.getPropertyValue('--sharp-color').trim();
-  const flatColor   = style.getPropertyValue('--flat-color').trim();
+  const inTuneColor = style.getPropertyValue('--in-tune-color').trim() || '#4caf50';
+  const sharpColor  = style.getPropertyValue('--sharp-color').trim()  || '#e53935';
+  const flatColor   = style.getPropertyValue('--flat-color').trim()   || '#1e88e5';
 
-  for (const ev of recordEvents) {
-    const midiRounded = Math.round(ev.midi);
-    if (midiRounded < loMidi || midiRounded > hiMidi) continue;
+  // ピッチグラフとしてイベントを描画（実際の周波数サンプルを点＋線で表示）
+  function drawEvent(ev, alpha) {
+    const samples = ev.freqSamples;
+    if (!samples || samples.length === 0) return;
 
-    const x0 = (ev.timeMs - scrollMs) / msPerPx;
-    const evW = Math.max(4 * dpr, ev.durationMs / msPerPx);
-    if (x0 + evW < 0 || x0 > w) continue;
-
-    const laneIdx = midiRounded - loMidi;
-    const laneY = h - (laneIdx + 1) * laneH;
-
-    // Cents position within lane (±50¢ → top/bottom of lane)
-    const centsOffset = clamp(ev.cents / 50, -1, 1);
-    const innerH = laneH * 0.7;
-    const innerY = laneY + (laneH - innerH) / 2;
-    const centY = innerY + innerH * 0.5 - (centsOffset * innerH * 0.5);
-    const dotH = Math.max(4 * dpr, innerH * 0.3);
-
-    const color = Math.abs(ev.cents) <= 5 ? inTuneColor
-                : ev.cents > 0 ? sharpColor : flatColor;
-
-    const rx = Math.max(0, x0);
-    const rw = Math.min(w - rx, evW - (rx - x0));
-    const ry = centY - dotH / 2;
-    const rr = Math.min(2 * dpr, rw / 2, dotH / 2);
-    ctx.fillStyle = color;
-    ctx.globalAlpha = 0.85;
-    ctx.beginPath();
-    if (ctx.roundRect) {
-      ctx.roundRect(rx, ry, rw, dotH, rr);
-    } else {
-      ctx.rect(rx, ry, rw, dotH);
+    const pts = [];
+    for (const s of samples) {
+      const x = (ev.timeMs + s.offsetMs - scrollMs) / msPerPx;
+      if (x < -6 || x > w + 6) continue;
+      const midiF = freqToMidi(s.freq, _concertPitch);
+      if (midiF < loMidi - 0.5 || midiF > hiMidi + 0.5) continue;
+      const y = h - (midiF - loMidi) / noteRange * h;
+      const centsF = (midiF - Math.round(midiF)) * 100;
+      const color = Math.abs(centsF) <= 5 ? inTuneColor : centsF > 0 ? sharpColor : flatColor;
+      pts.push({ x, y, color });
     }
-    ctx.fill();
-    ctx.globalAlpha = 1;
+    if (pts.length === 0) return;
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.lineWidth = 2.5 * dpr;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    // 線（隣接点ごとに色付け）
+    for (let i = 0; i < pts.length - 1; i++) {
+      ctx.strokeStyle = pts[i].color;
+      ctx.beginPath();
+      ctx.moveTo(pts[i].x, pts[i].y);
+      ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
+      ctx.stroke();
+    }
+    // ドット
+    for (const p of pts) {
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 3 * dpr, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
   }
 
-  // Current position line (recording or playing)
+  // Completed events
+  for (const ev of recordEvents) drawEvent(ev, 0.85);
+
+  // Active (in-progress) note during recording
+  if (recording && _lastFreq !== null && _freqSamples.length > 0) {
+    drawEvent({ timeMs: _lastEventStart, freqSamples: _freqSamples }, 0.95);
+  }
+
+  // Playhead line
   if (recording || playing) {
-    ctx.strokeStyle = style.getPropertyValue('--primary-color').trim();
+    ctx.strokeStyle = style.getPropertyValue('--primary-color').trim() || '#a0522d';
     ctx.lineWidth = 2 * dpr;
     const posX = w * 0.75;
     ctx.beginPath();

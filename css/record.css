@@ -10,7 +10,7 @@
   position: relative;
   display: flex;
   gap: 0;
-  height: 240px;
+  height: 420px;
   margin-bottom: 8px;
   background: var(--bg-color);
   border: 1px solid var(--dot-weak);
@@ -31,12 +31,31 @@
   border-left: 1px solid var(--dot-weak);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
-  padding: 4px 2px;
-  font-size: 0.58rem;
-  font-weight: bold;
-  text-align: center;
   overflow: hidden;
+}
+
+.record-pitch-axis .axis-white,
+.record-pitch-axis .axis-black {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.55rem;
+  font-weight: bold;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.record-pitch-axis .axis-white {
+  background: var(--surface-color);
+  color: var(--text-color);
+  border-bottom: 1px solid var(--dot-weak);
+}
+
+.record-pitch-axis .axis-black {
+  background: var(--dot-bg);
+  color: transparent;
+  border-bottom: 1px solid var(--dot-bg);
 }
 
 /* ---- 時間バー ---- */

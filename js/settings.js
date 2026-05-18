@@ -1,20 +1,24 @@
 /* NamaChu — 設定タブ */
 
-import { INSTRUMENTS, getInstrument, noteName, midiToNoteInfo, lsGet, lsSet, showToast } from './utils.js';
+import { INSTRUMENTS, INSTRUMENT_FAMILIES, DISPLAY_TRANSPOSITIONS, getInstrument, noteName, midiToNoteInfo, lsGet, lsSet, showToast } from './utils.js';
+import { getMicDevices, setMicDeviceId } from './audio.js';
 import { t, getLang } from './i18n.js';
 
 // ---- Default settings ----
 const DEFAULTS = {
-  instrumentId: 'concert',
-  concertPitch: 440,
+  instrumentId: 'bb_clar',
+  concertPitch: 442,
   noteStyle: 'abc',
+  displayTransId: 'C',
+  micDeviceId: null,
   theme: 'default',
-  minVolume: 10,   // 0–100 → mapped to minRms
-  clarity: 85,     // 0–100 → mapped to clarityThreshold 0–1
+  minVolume: 10,
+  clarity: 85,
+  collapsedCards: [],
 };
 
 let _settings = { ...DEFAULTS };
-let _onChange = null; // callback(settings)
+let _onChange = null;
 
 export function initSettings(onChange) {
   _onChange = onChange;
@@ -22,31 +26,48 @@ export function initSettings(onChange) {
   if (saved) _settings = { ...DEFAULTS, ...saved };
 
   populateInstrumentSelect();
+  populateDisplayTransSelect();
   buildThemeGrid();
   restoreUI();
   applyTheme(_settings.theme);
+  restoreCollapsedCards();
 }
 
 export function getSettings() { return { ..._settings }; }
 
-// ---- Instrument select ----
+// ---- Instrument select (grouped by family) ----
 function populateInstrumentSelect() {
+  const lang = getLang();
+  const html = buildInstrumentOptgroups(lang);
+
   const sel = document.getElementById('instrumentSelect');
   const sel2 = document.getElementById('scaleMeasureInstrument');
-  const lang = getLang();
-  const opts = INSTRUMENTS.map(inst => {
-    const name = lang === 'ja' ? inst.nameJa : inst.nameEn;
-    return `<option value="${inst.id}">${name}</option>`;
-  }).join('');
-  if (sel) { sel.innerHTML = opts; sel.value = _settings.instrumentId; }
-  if (sel2) { sel2.innerHTML = opts; sel2.value = _settings.instrumentId; }
+  if (sel) { sel.innerHTML = html; sel.value = _settings.instrumentId; }
+  if (sel2) { sel2.innerHTML = html; sel2.value = _settings.instrumentId; }
   updateInstrumentInfo();
+}
+
+function buildInstrumentOptgroups(lang) {
+  const grouped = {};
+  INSTRUMENTS.forEach(inst => {
+    if (!grouped[inst.family]) grouped[inst.family] = [];
+    grouped[inst.family].push(inst);
+  });
+  return INSTRUMENT_FAMILIES.map(fam => {
+    const insts = grouped[fam.id] || [];
+    if (insts.length === 0) return '';
+    const famName = lang === 'ja' ? fam.nameJa : fam.nameEn;
+    const opts = insts.map(inst => {
+      const name = lang === 'ja' ? inst.nameJa : inst.nameEn;
+      return `<option value="${inst.id}">${name}</option>`;
+    }).join('');
+    return `<optgroup label="${famName}">${opts}</optgroup>`;
+  }).join('');
 }
 
 export function onInstrumentChange() {
   const sel = document.getElementById('instrumentSelect');
   _settings.instrumentId = sel?.value || 'concert';
-  // sync scale tab selector
   const sel2 = document.getElementById('scaleMeasureInstrument');
   if (sel2) sel2.value = _settings.instrumentId;
   updateInstrumentInfo();
@@ -57,14 +78,12 @@ function updateInstrumentInfo() {
   const inst = getInstrument(_settings.instrumentId);
   const lang = getLang();
 
-  // Transposition label
   const transEl = document.getElementById('transpositionLabel');
   if (transEl) {
     const semi = inst.trans;
     transEl.textContent = semi === 0 ? 'C (concert)' : `${semi > 0 ? '+' : ''}${semi} 半音`;
   }
 
-  // Range label
   const rangeEl = document.getElementById('rangeLabel');
   if (rangeEl) {
     const lo = midiToNoteInfo(inst.loMidi);
@@ -74,7 +93,6 @@ function updateInstrumentInfo() {
     rangeEl.textContent = `${loName} – ${hiName}`;
   }
 
-  // Instrument badge on tuner tab
   const badge = document.getElementById('instrumentBadge');
   if (badge) badge.textContent = lang === 'ja' ? inst.nameJa : inst.nameEn;
 }
@@ -92,6 +110,52 @@ export function onNoteStyleChange() {
   const checked = document.querySelector('input[name="noteStyle"]:checked');
   _settings.noteStyle = checked?.value || 'abc';
   updateInstrumentInfo();
+  saveAndNotify();
+}
+
+// ---- Display transposition ----
+function populateDisplayTransSelect() {
+  const sel = document.getElementById('displayTransSelect');
+  if (!sel) return;
+  const lang = getLang();
+  sel.innerHTML = DISPLAY_TRANSPOSITIONS.map(dt =>
+    `<option value="${dt.id}">${lang === 'ja' ? dt.nameJa : dt.nameEn}</option>`
+  ).join('');
+  sel.value = _settings.displayTransId || 'C';
+}
+
+export function onDisplayTransChange() {
+  const sel = document.getElementById('displayTransSelect');
+  _settings.displayTransId = sel?.value || 'C';
+  saveAndNotify();
+}
+
+export function getDisplayTrans() {
+  return DISPLAY_TRANSPOSITIONS.find(d => d.id === _settings.displayTransId)
+    ?? DISPLAY_TRANSPOSITIONS[0];
+}
+
+// ---- Mic selection ----
+export async function refreshMicDevices() {
+  const sel = document.getElementById('micDeviceSelect');
+  if (!sel) return;
+  try {
+    const devices = await getMicDevices();
+    const current = _settings.micDeviceId;
+    sel.innerHTML = [
+      `<option value="">（デフォルト）</option>`,
+      ...devices.map(d => `<option value="${d.deviceId}">${d.label}</option>`)
+    ].join('');
+    sel.value = current || '';
+  } catch {
+    sel.innerHTML = `<option value="">（取得失敗）</option>`;
+  }
+}
+
+export function onMicDeviceChange() {
+  const sel = document.getElementById('micDeviceSelect');
+  _settings.micDeviceId = sel?.value || null;
+  setMicDeviceId(_settings.micDeviceId);
   saveAndNotify();
 }
 
@@ -128,7 +192,7 @@ function applyTheme(themeId) {
   if (themeId && themeId !== 'default') el.setAttribute('data-theme', themeId);
 }
 
-// ---- Mic sliders ----
+// ---- Mic sensitivity sliders ----
 export function onMinVolumeChange() {
   const v = parseInt(document.getElementById('minVolumeSlider').value);
   _settings.minVolume = v;
@@ -141,6 +205,23 @@ export function onClarityChange() {
   _settings.clarity = v;
   document.getElementById('clarityVal').textContent = v;
   saveAndNotify();
+}
+
+// ---- Accordion cards ----
+export function toggleCard(cardId) {
+  const card = document.getElementById(cardId);
+  if (!card) return;
+  card.classList.toggle('collapsed');
+  const collapsed = [...document.querySelectorAll('.setting-card.collapsed')].map(c => c.id);
+  _settings.collapsedCards = collapsed;
+  lsSet('settings', _settings);
+}
+
+function restoreCollapsedCards() {
+  const collapsed = _settings.collapsedCards || [];
+  collapsed.forEach(id => {
+    document.getElementById(id)?.classList.add('collapsed');
+  });
 }
 
 // ---- Data management ----
@@ -196,40 +277,53 @@ export function clearAllData() {
   saveAndNotify();
 }
 
-// ---- Restore UI from _settings ----
+// ---- Restore UI ----
 function restoreUI() {
-  // Instrument
-  const sel = document.getElementById('instrumentSelect');
-  if (sel) sel.value = _settings.instrumentId;
-  const sel2 = document.getElementById('scaleMeasureInstrument');
-  if (sel2) sel2.value = _settings.instrumentId;
-  updateInstrumentInfo();
+  populateInstrumentSelect();
+  populateDisplayTransSelect();
 
-  // Concert pitch
   document.getElementById('concertPitchVal').textContent = _settings.concertPitch;
   document.getElementById('concertPitchBadge').textContent = `A = ${_settings.concertPitch} Hz`;
 
-  // Note style
   const radio = document.querySelector(`input[name="noteStyle"][value="${_settings.noteStyle}"]`);
   if (radio) radio.checked = true;
 
-  // Theme
   buildThemeGrid();
   applyTheme(_settings.theme);
 
-  // Sliders
   const minVol = document.getElementById('minVolumeSlider');
   if (minVol) { minVol.value = _settings.minVolume; document.getElementById('minVolumeVal').textContent = _settings.minVolume; }
   const clar = document.getElementById('claritySlider');
   if (clar) { clar.value = _settings.clarity; document.getElementById('clarityVal').textContent = _settings.clarity; }
+
+  if (_settings.micDeviceId) setMicDeviceId(_settings.micDeviceId);
+  updateCardSummaries();
 }
 
 function saveAndNotify() {
   lsSet('settings', _settings);
+  updateCardSummaries();
   _onChange?.(_settings);
 }
 
-/** minVolume 0-100 → rms float */
+function updateCardSummaries() {
+  const lang = getLang();
+  const inst = getInstrument(_settings.instrumentId);
+  const instName = lang === 'ja' ? inst.nameJa : inst.nameEn;
+  const dt = getDisplayTrans();
+  const dtName = lang === 'ja' ? dt.nameJa : dt.nameEn;
+  const noteStyleLabel = _settings.noteStyle === 'do' ? 'ドレミ' : 'CDEFG';
+
+  _setSummary('summary-instrument', instName);
+  _setSummary('summary-pitch', `A = ${_settings.concertPitch} Hz`);
+  _setSummary('summary-notestyle', `${noteStyleLabel} / ${dtName}`);
+  _setSummary('summary-sensitivity', `音量 ${_settings.minVolume} / クラリティ ${_settings.clarity}`);
+}
+
+function _setSummary(id, text) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = text;
+}
+
 export function minVolumeToRms(v) { return v / 100 * 0.15; }
-/** clarity 0-100 → threshold 0-1 */
 export function clarityToThreshold(v) { return v / 100; }
