@@ -392,7 +392,7 @@ function _onChartClick(e) {
   const entries = [];
 
   if (currentResults[m]) {
-    entries.push({ name: noteLbl + ' (現在)', cents: Math.round(currentResults[m].avg), color });
+    entries.push({ name: noteLbl, cents: Math.round(currentResults[m].avg), color });
   }
   savedDatasets.forEach(ds => {
     const val = ds.results[m];
