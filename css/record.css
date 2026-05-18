@@ -166,7 +166,7 @@
   color: var(--text-color);
 }
 .record-list-modal h3 { margin: 0 0 12px; }
-.record-list-modal button {
+.record-list-modal > button {
   margin-top: 12px;
   width: 100%;
   padding: 10px;
