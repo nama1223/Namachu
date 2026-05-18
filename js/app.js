@@ -6,7 +6,8 @@ import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold } from 
 import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, toggleFullColor } from './tuner.js';
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle } from './record.js';
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset, onScaleInstrumentChange as _scaleInstChange } from './scale.js';
-import { initSettings, getSettings, onInstrumentChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard } from './settings.js';
+import { initSettings, getSettings, onInstrumentChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity } from './settings.js';
+import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, applyCalibration } from './calibration.js';
 
 // ---- Tab management ----
 let _currentTab = 'tuner';
@@ -112,6 +113,9 @@ function init() {
     clarityThreshold: clarityToThreshold(s.clarity),
   });
 
+  // Calibration
+  initCalibration(applyCalibratedSensitivity);
+
   // Apply i18n again after all elements rendered
   applyI18n();
 
@@ -167,6 +171,13 @@ function exposeGlobals() {
     }
   };
   g.showScaleHelp = () => openModal('scaleHelpModal');
+
+  // Calibration
+  g.openCalibration = openCalibration;
+  g.closeCalibration = closeCalibration;
+  g.startCalibrationRecord = startCalibrationRecord;
+  g.stopCalibrationRecord = stopCalibrationRecord;
+  g.applyCalibration = applyCalibration;
 
   // Modal helpers
   g.closeModal = closeModal;

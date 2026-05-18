@@ -11,6 +11,11 @@ let sourceNode = null;
 let _onPitch = null;
 let _running = false;
 let _deviceId = null;
+let _rawFrameCallback = null; // 校正用: フレーム毎に生バッファ＋RMSを渡す
+
+export function setRawFrameCallback(fn) { _rawFrameCallback = fn; }
+export function getSampleRate() { return audioCtx?.sampleRate || SAMPLE_RATE_DEFAULT; }
+export function getBufferSize() { return BUFFER_SIZE; }
 
 export function setMicDeviceId(id) { _deviceId = id || null; }
 
@@ -68,19 +73,21 @@ function _loop() {
   if (!_buf || _buf.length !== len) _buf = new Float32Array(len);
   analyser.getFloatTimeDomainData(_buf);
   const rms = calcRms(_buf);
+  // 校正用フック: コピーを渡して保存できるようにする
+  if (_rawFrameCallback) _rawFrameCallback(_buf, rms);
   if (rms < minRms) { _onPitch?.(null, 0, rms); return; }
   const sampleRate = audioCtx?.sampleRate || SAMPLE_RATE_DEFAULT;
   const result = yinDetect(_buf, sampleRate);
   _onPitch?.(result.freq, result.clarity, rms);
 }
 
-function calcRms(buf) {
+export function calcRms(buf) {
   let sum = 0;
   for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
   return Math.sqrt(sum / buf.length);
 }
 
-function yinDetect(buf, sampleRate) {
+export function yinDetect(buf, sampleRate) {
   const N = buf.length;
   const halfN = Math.floor(N / 2);
   const d = new Float32Array(halfN);

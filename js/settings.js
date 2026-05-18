@@ -327,3 +327,14 @@ function _setSummary(id, text) {
 
 export function minVolumeToRms(v) { return v / 100 * 0.15; }
 export function clarityToThreshold(v) { return v / 100; }
+
+// ---- 自動校正からの設定適用 ----
+export function applyCalibratedSensitivity(minVolume, clarity) {
+  _settings.minVolume = minVolume;
+  _settings.clarity = clarity;
+  const mv = document.getElementById('minVolumeSlider');
+  const cl = document.getElementById('claritySlider');
+  if (mv) { mv.value = minVolume; document.getElementById('minVolumeVal').textContent = minVolume; }
+  if (cl) { cl.value = clarity;   document.getElementById('clarityVal').textContent   = clarity; }
+  saveAndNotify();
+}

@@ -300,6 +300,9 @@
           <input type="range" id="claritySlider" min="0" max="100" value="85" oninput="onClarityChange()">
           <span id="clarityVal">85</span>
         </div>
+        <div class="setting-row" style="margin-top:8px;">
+          <button class="setting-action-btn" style="width:100%;" onclick="openCalibration()" data-i18n="btn_auto_calibrate">▶ 感度の自動調整</button>
+        </div>
       </div>
     </div>
 
@@ -343,6 +346,16 @@
     <div class="modal-buttons">
       <button onclick="closeModal('scaleHelpModal')" data-i18n="btn_close">閉じる</button>
     </div>
+  </div>
+</div>
+
+<!-- ===== マイク感度 自動調整モーダル ===== -->
+<div class="modal-overlay" id="calibrationModal" onclick="if(event.target===this)closeCalibration()">
+  <div class="modal-content calib-modal">
+    <h2 data-i18n="calib_title">マイク感度の自動調整</h2>
+    <div class="calib-status" id="calibStatus"></div>
+    <div class="calib-visual" id="calibVisual"></div>
+    <div class="calib-buttons" id="calibButtons"></div>
   </div>
 </div>
 
