@@ -658,82 +658,91 @@ function _renderList() {
   const ctx = chartCtx;
   const style = getComputedStyle(document.documentElement);
 
-  const bgColor   = style.getPropertyValue('--bg-color').trim()        || '#fff';
-  const textColor = style.getPropertyValue('--text-color').trim()       || '#333';
-  const dotWeak   = style.getPropertyValue('--dot-weak').trim()         || '#ccc';
-  const inTuneCol = style.getPropertyValue('--in-tune-color').trim()    || '#4caf50';
-  const sharpCol  = style.getPropertyValue('--sharp-color').trim()      || '#e53935';
-  const flatCol   = style.getPropertyValue('--flat-color').trim()       || '#1e88e5';
+  const bgColor   = style.getPropertyValue('--bg-color').trim()     || '#fff';
+  const textColor = style.getPropertyValue('--text-color').trim()    || '#333';
+  const dotWeak   = style.getPropertyValue('--dot-weak').trim()      || '#ccc';
+  const inTuneCol = style.getPropertyValue('--in-tune-color').trim() || '#4caf50';
+  const sharpCol  = style.getPropertyValue('--sharp-color').trim()   || '#e53935';
+  const flatCol   = style.getPropertyValue('--flat-color').trim()    || '#1e88e5';
 
   ctx.fillStyle = bgColor;
   ctx.fillRect(0, 0, w, h);
 
   const loMidi = _instrument.loMidi;
   const hiMidi = _instrument.hiMidi;
-  // MIDI octave: C4=60 → octave = floor(midi/12)-1
-  const loOct = Math.floor(loMidi / 12) - 1;
-  const hiOct = Math.floor(hiMidi / 12) - 1;
+  const loOct  = Math.floor(loMidi / 12) - 1;
+  const hiOct  = Math.floor(hiMidi / 12) - 1;
   const octCount = hiOct - loOct + 1;
 
   const ROW_COUNT = 12;
-  const padL = 4 * dpr, padR = 4 * dpr, padT = 18 * dpr, padB = 4 * dpr;
-  const plotW = w - padL - padR;
-  const plotH = h - padT - padB;
-  const colW  = plotW / octCount;
-  const rowH  = plotH / ROW_COUNT;
-  // 行の高さに合わせてフォントサイズを決める（最大11dpr, 最小7dpr）
-  const fontSize = clamp(rowH * 0.38, 7 * dpr, 11 * dpr);
   const BLACK_SET = new Set([1, 3, 6, 8, 10]);
 
-  // オクターブ列ヘッダー（例: C4 の "4"）
-  ctx.font = `bold ${clamp(fontSize * 0.9, 7 * dpr, 10 * dpr)}px sans-serif`;
+  // ヘッダー行の高さ: 行高の 0.7 倍（最小 16dpr）
+  // まず行高を仮計算してヘッダーの高さを決める
+  const padL = 4 * dpr, padR = 4 * dpr, padB = 4 * dpr;
+  const rawRowH = (h - padB) / (ROW_COUNT + 0.7); // 0.7 = ヘッダー行の比率
+  const headerH = rawRowH * 0.7;
+  const padT = headerH + 2 * dpr;
+  const plotH = h - padT - padB;
+  const colW  = (w - padL - padR) / octCount;
+  const rowH  = plotH / ROW_COUNT;
+
+  // フォントサイズ: 行高の 52%（上限なし、最小 8dpr）
+  const fontSize = Math.max(8 * dpr, rowH * 0.52);
+  // cents 値のフォントサイズ: 音名より少し小さく
+  const centsSize = fontSize * 0.82;
+
+  // ---- オクターブ列ヘッダー ----
+  ctx.font = `bold ${Math.max(8 * dpr, headerH * 0.6)}px sans-serif`;
   ctx.textAlign = 'center';
   for (let oct = loOct; oct <= hiOct; oct++) {
     const x = padL + (oct - loOct + 0.5) * colW;
     ctx.fillStyle = textColor;
-    ctx.globalAlpha = 0.55;
-    ctx.fillText(`C${oct}`, x, padT - 4 * dpr);
+    ctx.globalAlpha = 0.5;
+    ctx.fillText(`C${oct}`, x, headerH * 0.82);
   }
   ctx.globalAlpha = 1;
 
-  // 縦区切り線
+  // ---- 縦区切り線 ----
   ctx.strokeStyle = dotWeak;
   ctx.lineWidth = 1 * dpr;
-  ctx.globalAlpha = 0.35;
+  ctx.globalAlpha = 0.3;
   for (let i = 0; i <= octCount; i++) {
     const x = padL + i * colW;
     ctx.beginPath();
-    ctx.moveTo(x, padT - 16 * dpr);
+    ctx.moveTo(x, 0);
     ctx.lineTo(x, h - padB);
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
 
-  // 各行（半音）を描画
+  // ---- 各行（半音） ----
   for (let row = 0; row < ROW_COUNT; row++) {
-    const semitone = row; // 0=C … 11=B (下へいくほど高い音)
-    const isBlack = BLACK_SET.has(semitone);
+    const semitone = row; // 0=C … 11=B
+    const isBlack  = BLACK_SET.has(semitone);
     const ry = padT + row * rowH;
+    // テキストのベースライン Y（行の中央に来るよう調整）
+    const baseY = ry + rowH * 0.5 + fontSize * 0.35;
 
-    // 黒鍵行の背景を薄く着色
+    // 黒鍵行の背景
     if (isBlack) {
       ctx.fillStyle = dotWeak;
-      ctx.globalAlpha = 0.1;
-      ctx.fillRect(padL, ry, plotW, rowH);
+      ctx.globalAlpha = 0.12;
+      ctx.fillRect(padL, ry, w - padL - padR, rowH);
       ctx.globalAlpha = 1;
     }
 
     // 行区切り線
     ctx.strokeStyle = dotWeak;
     ctx.lineWidth = 0.5 * dpr;
-    ctx.globalAlpha = 0.35;
+    ctx.globalAlpha = 0.3;
     ctx.beginPath();
     ctx.moveTo(padL, ry);
     ctx.lineTo(w - padR, ry);
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // 各列（オクターブ）
+    // ---- 各列（オクターブ） ----
     for (let oct = loOct; oct <= hiOct; oct++) {
       const midi = (oct + 1) * 12 + semitone;
       if (midi < loMidi || midi > hiMidi) continue;
@@ -741,43 +750,51 @@ function _renderList() {
       const cx = padL + (oct - loOct) * colW;
       const noteColor = _noteColor(midi);
       const info = midiToNoteInfo(midi);
-      // C は "C4" 形式、それ以外は音名のみ
       const label = noteName(info.note, info.octave, _noteStyle, semitone === 0);
 
-      // 音名
-      ctx.font = `${isBlack ? '' : 'bold '}${fontSize}px sans-serif`;
-      ctx.textAlign = 'left';
-      ctx.fillStyle = noteColor;
-      ctx.globalAlpha = isBlack ? 0.75 : 0.9;
-      ctx.fillText(label, cx + 3 * dpr, ry + rowH * 0.62);
-      ctx.globalAlpha = 1;
-
-      // cents 値（現在測定＋保存データセット）
+      // cents 値の収集
       const allVals = [];
-      if (currentResults[midi]) {
-        allVals.push({ cents: currentResults[midi].avg, isCurrent: true });
-      }
+      if (currentResults[midi]) allVals.push({ cents: currentResults[midi].avg });
       savedDatasets.forEach(ds => {
         const v = ds.results[midi];
-        if (v !== undefined) {
-          allVals.push({ cents: Math.round(typeof v === 'object' ? v.avg : v), isCurrent: false, dsColor: ds.color });
-        }
+        if (v !== undefined) allVals.push({ cents: Math.round(typeof v === 'object' ? v.avg : v), dsColor: ds.color });
       });
 
-      if (allVals.length > 0) {
-        const vFontSize = clamp(fontSize * (allVals.length > 1 ? 0.72 : 0.88), 6 * dpr, 10 * dpr);
-        ctx.font = `bold ${vFontSize}px sans-serif`;
+      if (allVals.length === 0) {
+        // データなし: 音名だけ薄く表示
+        ctx.font = `${isBlack ? '' : 'bold '}${fontSize}px sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = noteColor;
+        ctx.globalAlpha = isBlack ? 0.45 : 0.55;
+        ctx.fillText(label, cx + 4 * dpr, baseY);
+        ctx.globalAlpha = 1;
+      } else {
+        // データあり: 音名（左）＋ cents（右）
+        ctx.font = `bold ${fontSize}px sans-serif`;
+        ctx.textAlign = 'left';
+        ctx.fillStyle = noteColor;
+        ctx.globalAlpha = 1;
+        ctx.fillText(label, cx + 4 * dpr, baseY);
+
+        ctx.font = `bold ${centsSize}px sans-serif`;
         ctx.textAlign = 'right';
-        const rightX = cx + colW - 3 * dpr;
-        allVals.forEach((v, vi) => {
+        const rightX = cx + colW - 4 * dpr;
+        if (allVals.length === 1) {
+          const v = allVals[0];
           const sign = v.cents >= 0 ? '+' : '';
           ctx.fillStyle = Math.abs(v.cents) <= 5 ? inTuneCol : v.cents > 0 ? sharpCol : flatCol;
-          // 複数ある場合は上下に分割配置
-          const fracY = allVals.length === 1
-            ? 0.62
-            : 0.28 + vi * (0.65 / (allVals.length - 1));
-          ctx.fillText(`${sign}${v.cents}`, rightX, ry + rowH * fracY);
-        });
+          ctx.fillText(`${sign}${v.cents}`, rightX, baseY);
+        } else {
+          // 複数: フォントを縮小して上下に配置
+          const smSize = centsSize * 0.75;
+          ctx.font = `bold ${smSize}px sans-serif`;
+          allVals.forEach((v, vi) => {
+            const sign = v.cents >= 0 ? '+' : '';
+            ctx.fillStyle = Math.abs(v.cents) <= 5 ? inTuneCol : v.cents > 0 ? sharpCol : flatCol;
+            const ty = ry + rowH * (0.28 + vi * (0.55 / Math.max(1, allVals.length - 1)));
+            ctx.fillText(`${sign}${v.cents}`, rightX, ty + smSize * 0.35);
+          });
+        }
       }
     }
   }
