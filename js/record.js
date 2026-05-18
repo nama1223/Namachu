@@ -5,9 +5,10 @@ import { playSynthSequence } from './audio.js';
 import { t } from './i18n.js';
 
 // ---- Constants ----
-const MIN_NOTE_MS        = 25;   // 最小音符長（16分音符三連符 tempo170 ≈ 59ms に対応）
-const OCTAVE_REJECT_SEMIS = 7;   // これ以上のセミトーン差は オクターヴ誤検出とみなし棄却
-const FREQ_EMA_ALPHA     = 0.35; // 周波数EMAの追跡速度（高=速）
+const MIN_NOTE_MS          = 25;   // 最小音符長（16分音符三連符 tempo170 ≈ 59ms に対応）
+const OCTAVE_REJECT_SEMIS  = 7;    // これ以上のセミトーン差は棄却
+const FREQ_EMA_ALPHA       = 0.35; // 周波数EMAの追跡速度（高=速）
+const OCTAVE_CONFIRM_FRAMES = 4;   // 何フレーム連続でオクターヴずれが続いたら本物の跳躍とみなすか（≈67ms）
 
 // ---- State ----
 let _instrument = null;
@@ -27,7 +28,8 @@ let _currentSynthHandle = null;
 let _playbackTimer = null;
 
 // ---- Pitch sanity state ----
-let _freqEma = null; // 周波数の指数移動平均（オクターヴ補正用）
+let _freqEma = null;          // 周波数の指数移動平均（オクターヴ補正用）
+let _octaveShiftCount = 0;    // オクターヴずれが何フレーム連続したか
 
 // Canvas
 let canvas = null;
@@ -95,6 +97,7 @@ function startRecording() {
   _lastFreq = null;
   _freqSamples = [];
   _freqEma = null;
+  _octaveShiftCount = 0;
   document.getElementById('recBtn')?.classList.add('recording');
   document.getElementById('playBackBtn').disabled = true;
   updateTimeBar(0, 0);
@@ -114,21 +117,38 @@ function getTotalDuration() {
 }
 
 // ---- オクターヴ誤検出フィルタ＆補正 ----
-// EMAからオクターヴ分ずれている場合は2^N で除して補正を試みる。
-// 補正後も大きくずれる場合は棄却する。
+// ・1〜数フレームの短いオクターヴずれ → 誤検出として補正
+// ・OCTAVE_CONFIRM_FRAMES フレーム以上持続 → 本物のオクターヴ跳躍として受け入れ
 function sanitizeFreq(freq) {
-  if (_freqEma === null) { _freqEma = freq; return freq; }
+  if (_freqEma === null) { _freqEma = freq; _octaveShiftCount = 0; return freq; }
   const ratio = freq / _freqEma;
   const octaves = Math.round(Math.log2(ratio));
+
   if (octaves !== 0) {
     const corrected = freq / Math.pow(2, octaves);
     const correctedSemis = Math.abs(12 * Math.log2(corrected / _freqEma));
+
     if (correctedSemis <= 4) {
-      freq = corrected; // オクターヴ誤検出を修正
+      // オクターヴ分ずれているが補正後はEMAに近い → 誤検出 or 本物の跳躍
+      _octaveShiftCount++;
+      if (_octaveShiftCount >= OCTAVE_CONFIRM_FRAMES) {
+        // 連続して同じオクターヴずれ → 本物の跳躍として確定、EMAをリセット
+        _freqEma = freq;
+        _octaveShiftCount = 0;
+        return freq;
+      }
+      // まだ短い → 誤検出として元のオクターヴに補正
+      freq = corrected;
     } else if (Math.abs(12 * Math.log2(freq / _freqEma)) > OCTAVE_REJECT_SEMIS) {
-      return null; // 補正できない → 棄却
+      _octaveShiftCount = 0;
+      return null; // 補正不能 → 棄却
+    } else {
+      _octaveShiftCount = 0;
     }
+  } else {
+    _octaveShiftCount = 0; // 正常範囲に戻ったらカウントリセット
   }
+
   _freqEma = _freqEma * Math.pow(freq / _freqEma, FREQ_EMA_ALPHA);
   return freq;
 }
@@ -141,6 +161,7 @@ export function onRecordPitch(freq, clarity, clarityThreshold) {
   // --- 無音判定 ---
   if (!freq || clarity < clarityThreshold) {
     _freqEma = null;
+    _octaveShiftCount = 0;
     if (_lastFreq !== null) finalizeCurrentEvent(now);
     _lastFreq = null;
     _freqSamples = [];

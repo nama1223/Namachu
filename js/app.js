@@ -19,7 +19,7 @@ function switchTab(name) {
   document.getElementById('tabBtn-' + name)?.classList.add('active');
 
   // Auto-start mic when entering pitch-detection tabs
-  if ((name === 'tuner' || name === 'scale') && !isMicRunning()) {
+  if ((name === 'tuner' || name === 'scale' || name === 'record') && !isMicRunning()) {
     startMic(onAudioFrame)
       .then(() => document.getElementById('micToggleBtn')?.classList.add('active'))
       .catch(() => showToast(t('toast_mic_denied')));
