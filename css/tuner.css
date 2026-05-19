@@ -150,9 +150,11 @@
   gap: 4px;
   margin-top: 10px;
   height: 270px;
+  overflow: hidden;
 }
 .time-graph {
   flex: 1;
+  min-width: 0;      /* flex内でcanvasのwidth属性が最小幅として効くのを防ぐ */
   border-radius: 8px;
   background: var(--bg-color);
   border: 1px solid var(--dot-weak);
