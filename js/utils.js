@@ -2,8 +2,8 @@
 
 // ---- Music / pitch math ----
 
-export const NOTE_NAMES_ABC = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
-export const NOTE_NAMES_DO  = ['ド','ド#','レ','レ#','ミ','ファ','ファ#','ソ','ソ#','ラ','ラ#','シ'];
+export const NOTE_NAMES_ABC = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+export const NOTE_NAMES_DO  = ['ド','レ♭','レ','ミ♭','ミ','ファ','ソ♭','ソ','ラ♭','ラ','シ♭','シ'];
 
 export function freqToMidi(freq, concertPitchA4 = 440) {
   return 69 + 12 * Math.log2(freq / concertPitchA4);

@@ -90,10 +90,8 @@ function buildPitchAxis() {
   for (let m = _instrument.hiMidi; m >= _instrument.loMidi; m--) {
     const info = midiToNoteInfo(m);
     const isBlack = BLACK_KEYS.has(info.note);
-    // Only label C notes to avoid crowding
-    const label = (!isBlack && info.note === 0)
-      ? noteName(info.note, info.octave, _noteStyle, true)
-      : '';
+    // Label all white keys; show octave number only on C to mark octave boundaries
+    const label = isBlack ? '' : noteName(info.note, info.octave, _noteStyle, info.note === 0);
     spans.push(`<span class="${isBlack ? 'axis-black' : 'axis-white'}">${label}</span>`);
   }
   el.innerHTML = spans.join('');
