@@ -40,8 +40,8 @@
 
 <div class="app-tabs">
   <button class="tab-btn active" id="tabBtn-tuner" onclick="switchTab('tuner')" data-i18n="tab_tuner">チューナー</button>
-  <button class="tab-btn" id="tabBtn-record" onclick="switchTab('record')" data-i18n="tab_record">記録</button>
-  <button class="tab-btn" id="tabBtn-scale" onclick="switchTab('scale')" data-i18n="tab_scale">音階測定</button>
+  <button class="tab-btn" id="tabBtn-record" onclick="switchTab('record')" data-i18n="tab_record">音階記録</button>
+  <button class="tab-btn" id="tabBtn-scale" onclick="switchTab('scale')" data-i18n="tab_scale">楽器測定</button>
   <button class="tab-btn" id="tabBtn-settings" onclick="switchTab('settings')" data-i18n="tab_settings">設定</button>
 </div>
 
@@ -107,7 +107,7 @@
   <!-- ===== 記録タブ ===== -->
   <div id="tab-record" class="tab-content">
     <div class="header-row">
-      <h1 data-i18n="tab_record">記録</h1>
+      <h1 data-i18n="tab_record">音階記録</h1>
       <div class="record-header-btns">
         <button class="icon-btn" id="saveRecordBtn" onclick="saveRecording()" title="保存">💾</button>
         <button class="icon-btn" id="loadRecordBtn" onclick="showRecordList()" title="読み込み">📂</button>
@@ -145,7 +145,7 @@
   <!-- ===== 音階測定タブ ===== -->
   <div id="tab-scale" class="tab-content">
     <div class="header-row">
-      <h1 data-i18n="tab_scale">音階測定</h1>
+      <h1 data-i18n="tab_scale">楽器測定</h1>
       <button class="icon-btn" id="scaleHelpBtn" onclick="showScaleHelp()">?</button>
     </div>
 
@@ -367,7 +367,7 @@
 <!-- ===== ヘルプモーダル（音階測定） ===== -->
 <div class="modal-overlay" id="scaleHelpModal" onclick="if(event.target===this)closeModal('scaleHelpModal')">
   <div class="modal-content">
-    <h2 data-i18n="help_scale_title">音階測定とは</h2>
+    <h2 data-i18n="help_scale_title">楽器測定とは</h2>
     <p data-i18n="help_scale_body">楽器固有の音程の癖を記録します。各音を3回吹くと平均値を記録します。吹き始めと吹き終わりは除外されます。好きな音から好きな順序で測定できます。</p>
     <div class="modal-buttons">
       <button onclick="closeModal('scaleHelpModal')" data-i18n="btn_close">閉じる</button>

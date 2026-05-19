@@ -569,7 +569,7 @@ function drawCanvas() {
       if (x < -6 || x > w + 6) continue;
       const midiF = freqToMidi(s.freq, _concertPitch);
       if (midiF < loMidi - 0.5 || midiF > hiMidi + 0.5) continue;
-      const y = h - (midiF - loMidi) / noteRange * h;
+      const y = h - (midiF - loMidi + 0.5) / noteRange * h;
       const centsF = (midiF - Math.round(midiF)) * 100;
       const color = Math.abs(centsF) <= 5 ? inTuneColor : centsF > 0 ? sharpColor : flatColor;
       pts.push({ x, y, color });
