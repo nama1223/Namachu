@@ -202,6 +202,63 @@
   gap: 10px;
 }
 
+/* ---- 基準音コントロールバー ---- */
+.tuner-control-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0 4px;
+  border-top: 1px solid var(--dot-weak);
+  margin-top: 4px;
+}
+
+.ref-pitch-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ref-pitch-picker {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface-color);
+  border: 1px solid var(--dot-weak);
+  border-radius: 8px;
+  padding: 4px 8px;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  min-width: 54px;
+  font-weight: bold;
+  font-size: 0.92rem;
+}
+.ref-pitch-picker:active { cursor: grabbing; }
+
+.ref-pitch-arrows {
+  font-size: 0.55rem;
+  opacity: 0.4;
+  line-height: 1.2;
+  letter-spacing: -1px;
+}
+
+.ref-pitch-btn {
+  padding: 4px 12px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--dot-weak);
+  background: var(--surface-color);
+  color: var(--text-color);
+  font-size: 0.8rem;
+  font-weight: bold;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.ref-pitch-btn.active {
+  background: var(--in-tune-color);
+  color: #fff;
+  border-color: var(--in-tune-color);
+}
+
 .full-color-btn {
   font-size: 0.70rem;
   font-weight: bold;

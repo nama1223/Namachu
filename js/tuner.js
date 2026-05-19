@@ -1,6 +1,6 @@
 /* NamaChu — チューナータブ (meter + time-graph) */
 
-import { freqToMidi, midiToNoteInfo, noteName } from './utils.js';
+import { freqToMidi, midiToNoteInfo, noteName, midiToFreq } from './utils.js';
 
 // ---- State ----
 let _concertPitch = 442;
@@ -9,6 +9,15 @@ let _instrument = null;
 let _displayTrans = 0; // semitones: displayMidi = concertMidi - _displayTrans
 let _clarityThreshold = 0.85;
 let _fullColorEnabled = false;
+
+// ---- Reference pitch state ----
+const REF_PITCH_LO = 48; // C3
+const REF_PITCH_HI = 84; // C6
+let _refMidi = 69;        // A4 default
+let _refCtx  = null;
+let _refOsc  = null;
+let _refGain = null;
+let _refPlaying = false;
 
 // Time-graph circular buffer (3段表示用に 30 秒分)
 const GRAPH_SECONDS = 30;
@@ -33,15 +42,26 @@ export function initTuner(opts = {}) {
   _clarityThreshold = opts.clarityThreshold ?? 0.85;
   _displayTrans = opts.displayTrans ?? 0;
 
+  // Load stored reference pitch (concert MIDI)
+  const stored = parseInt(localStorage.getItem('namaChu_refPitchMidi'));
+  _refMidi = isNaN(stored) ? 69 : Math.max(REF_PITCH_LO, Math.min(REF_PITCH_HI, stored));
+
   buildMeterTicks();
   initTimeGraph();
   resetDisplay();
+  _initRefPitchPicker();
+  _updateRefPitchDisplay();
 }
 
-export function setTunerConcertPitch(hz) { _concertPitch = hz; }
-export function setTunerNoteStyle(s) { _noteStyle = s; }
+export function setTunerConcertPitch(hz) {
+  _concertPitch = hz;
+  if (_refPlaying && _refOsc && _refCtx) {
+    _refOsc.frequency.setTargetAtTime(midiToFreq(_refMidi, hz), _refCtx.currentTime, 0.05);
+  }
+}
+export function setTunerNoteStyle(s) { _noteStyle = s; _updateRefPitchDisplay(); }
 export function setTunerInstrument(inst) { _instrument = inst; }
-export function setTunerDisplayTrans(semitones) { _displayTrans = semitones; }
+export function setTunerDisplayTrans(semitones) { _displayTrans = semitones; _updateRefPitchDisplay(); }
 export function setTunerClarityThreshold(v) { _clarityThreshold = v; }
 
 export function toggleFullColor() {
@@ -368,6 +388,116 @@ function updateFullColorBg(cents) {
   const [r, g, b] = blendRgb(baseHex, fgHex, ratio);
   const cont = document.querySelector('.container');
   if (cont) cont.style.backgroundColor = `rgb(${r},${g},${b})`;
+}
+
+// ---- Reference pitch ----
+
+export function toggleRefPitch() {
+  if (_refPlaying) _stopRefPitch();
+  else _startRefPitch();
+}
+
+export function stepRefPitch(delta) {
+  const next = Math.max(REF_PITCH_LO, Math.min(REF_PITCH_HI, _refMidi + delta));
+  if (next === _refMidi) return;
+  _refMidi = next;
+  localStorage.setItem('namaChu_refPitchMidi', _refMidi);
+  _updateRefPitchDisplay();
+  if (_refPlaying && _refOsc && _refCtx) {
+    _refOsc.frequency.setTargetAtTime(midiToFreq(_refMidi, _concertPitch), _refCtx.currentTime, 0.04);
+  }
+}
+
+function _startRefPitch() {
+  if (_refCtx) { try { _refCtx.close(); } catch(e) {} _refCtx = null; }
+  _refCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+  // クラリネット近似: 奇数倍音が強い
+  const n = 10;
+  const real = new Float32Array(n); // cosine (all 0)
+  const imag = new Float32Array(n); // sine
+  imag[1] = 1.00; imag[2] = 0.02; imag[3] = 0.50;
+  imag[4] = 0.01; imag[5] = 0.22; imag[6] = 0.01;
+  imag[7] = 0.08; imag[8] = 0.01; imag[9] = 0.04;
+  const wave = _refCtx.createPeriodicWave(real, imag);
+
+  _refGain = _refCtx.createGain();
+  const now = _refCtx.currentTime;
+  _refGain.gain.setValueAtTime(0, now);
+  _refGain.gain.linearRampToValueAtTime(0.28, now + 0.06);
+  _refGain.connect(_refCtx.destination);
+
+  _refOsc = _refCtx.createOscillator();
+  _refOsc.setPeriodicWave(wave);
+  _refOsc.frequency.value = midiToFreq(_refMidi, _concertPitch);
+  _refOsc.connect(_refGain);
+  _refOsc.start();
+
+  document.addEventListener('visibilitychange', _onRefVisibilityChange);
+  _refPlaying = true;
+  _updateRefBtn(true);
+}
+
+function _stopRefPitch() {
+  if (_refGain && _refCtx) {
+    _refGain.gain.setTargetAtTime(0, _refCtx.currentTime, 0.04);
+    const ctx = _refCtx;
+    setTimeout(() => { try { ctx.close(); } catch(e) {} }, 300);
+  }
+  document.removeEventListener('visibilitychange', _onRefVisibilityChange);
+  _refCtx = null; _refOsc = null; _refGain = null;
+  _refPlaying = false;
+  _updateRefBtn(false);
+}
+
+function _onRefVisibilityChange() {
+  if (!document.hidden && _refPlaying && _refCtx?.state === 'suspended') {
+    _refCtx.resume().catch(() => {});
+  }
+}
+
+function _updateRefPitchDisplay() {
+  const displayMidi = _refMidi - _displayTrans;
+  const info = midiToNoteInfo(displayMidi);
+  const el = document.getElementById('refPitchNote');
+  if (el) el.textContent = noteName(info.note, info.octave, _noteStyle, true);
+}
+
+function _updateRefBtn(playing) {
+  const btn = document.getElementById('refPitchBtn');
+  if (btn) btn.classList.toggle('active', playing);
+}
+
+function _initRefPitchPicker() {
+  const picker = document.getElementById('refPitchPicker');
+  if (!picker) return;
+
+  // マウスホイール: 上 = 高音
+  picker.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    stepRefPitch(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+
+  // タッチスワイプ: 上スワイプ = 高音 (18px/半音)
+  let _ty0 = 0, _tm0 = _refMidi;
+  picker.addEventListener('touchstart', (e) => {
+    _ty0 = e.touches[0].clientY;
+    _tm0 = _refMidi;
+    e.preventDefault();
+  }, { passive: false });
+
+  picker.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    const semi = Math.round((_ty0 - e.touches[0].clientY) / 18);
+    const target = Math.max(REF_PITCH_LO, Math.min(REF_PITCH_HI, _tm0 + semi));
+    if (target === _refMidi) return;
+    _refMidi = target;
+    localStorage.setItem('namaChu_refPitchMidi', _refMidi);
+    _updateRefPitchDisplay();
+    if (_refPlaying && _refOsc && _refCtx) {
+      _refOsc.frequency.setTargetAtTime(midiToFreq(_refMidi, _concertPitch), _refCtx.currentTime, 0.04);
+    }
+  }, { passive: false });
 }
 
 export function stopGraphLoop() {

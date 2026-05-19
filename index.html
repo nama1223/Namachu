@@ -51,13 +51,6 @@
   <div id="tab-tuner" class="tab-content active">
     <div class="header-row">
       <h1 id="appTitle">NamaChu</h1>
-      <div class="tuner-header-right">
-        <button class="full-color-btn" id="fullColorBtn" onclick="toggleFullColor()" title="全面カラー" data-i18n="btn_full_color">全面色</button>
-        <div class="mic-btn-wrap">
-          <button class="mic-btn" id="micToggleBtn" onclick="toggleMic()">🎤</button>
-          <span class="mic-status-text" id="micStatusText">OFF</span>
-        </div>
-      </div>
     </div>
 
     <!-- 上半分: アナログメーター -->
@@ -83,6 +76,24 @@
         <div class="note-octave" id="noteOctave"></div>
         <div class="note-cents" id="noteCents">±0 ¢</div>
         <div class="note-freq" id="noteFreq">-- Hz</div>
+      </div>
+    </div>
+
+    <!-- 基準音 + マイク/全面色コントロール -->
+    <div class="tuner-control-bar">
+      <div class="ref-pitch-left">
+        <div class="ref-pitch-picker" id="refPitchPicker" title="スクロール/スワイプで音程変更">
+          <span id="refPitchNote">A4</span>
+          <span class="ref-pitch-arrows">▲▼</span>
+        </div>
+        <button class="ref-pitch-btn" id="refPitchBtn" onclick="toggleRefPitch()" data-i18n="btn_ref_pitch">基準音</button>
+      </div>
+      <div class="tuner-header-right">
+        <button class="full-color-btn" id="fullColorBtn" onclick="toggleFullColor()" title="全面カラー" data-i18n="btn_full_color">全面色</button>
+        <div class="mic-btn-wrap">
+          <button class="mic-btn" id="micToggleBtn" onclick="toggleMic()">🎤</button>
+          <span class="mic-status-text" id="micStatusText">OFF</span>
+        </div>
       </div>
     </div>
 

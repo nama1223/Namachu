@@ -1,5 +1,5 @@
 // バージョンを上げると古いキャッシュが破棄される
-const VERSION = 'v17';
+const VERSION = 'v18';
 const CACHE_NAME = `namachu-cache-${VERSION}`;
 
 const urlsToCache = [
