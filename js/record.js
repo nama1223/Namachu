@@ -594,7 +594,7 @@ function drawCanvas() {
     for (const p of pts) {
       ctx.fillStyle = p.color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, 1.5 * dpr, 0, Math.PI * 2);
+      ctx.arc(p.x, p.y, 0.5 * dpr, 0, Math.PI * 2);
       ctx.fill();
     }
     ctx.restore();
