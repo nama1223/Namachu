@@ -44,17 +44,28 @@ export async function startMic(onPitch) {
   analyser.smoothingTimeConstant = 0;
   sourceNode.connect(analyser);
 
+  // iOS Safari はバックグラウンド移行・画面ロック等で AudioContext を自動 suspend する。
+  // ページが前景に戻ったタイミングで即座に resume する。
+  document.addEventListener('visibilitychange', _onVisibilityChange);
+
   _running = true;
   _loop();
 }
 
 export function stopMic() {
   _running = false;
+  document.removeEventListener('visibilitychange', _onVisibilityChange);
   micStream?.getTracks().forEach(t => t.stop());
   sourceNode?.disconnect();
   analyser?.disconnect();
   if (audioCtx?.state !== 'closed') audioCtx?.close();
   audioCtx = analyser = micStream = sourceNode = null;
+}
+
+function _onVisibilityChange() {
+  if (!document.hidden && _running && audioCtx?.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
 }
 
 export function isMicRunning() { return _running; }
@@ -74,6 +85,14 @@ let _buf = null;
 function _loop() {
   if (!_running) return;
   requestAnimationFrame(_loop);
+
+  // iOS Safari / モバイルブラウザは長音保持中や画面ロック後に AudioContext を
+  // 自動 suspend することがある。毎フレーム確認して suspended なら即 resume する。
+  if (audioCtx?.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+    return; // 再開待ち: 次フレームで処理再開
+  }
+
   if (!analyser) return;
   const len = analyser.fftSize;
   if (!_buf || _buf.length !== len) _buf = new Float32Array(len);
