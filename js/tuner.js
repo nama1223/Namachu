@@ -10,11 +10,12 @@ let _displayTrans = 0; // semitones: displayMidi = concertMidi - _displayTrans
 let _clarityThreshold = 0.85;
 let _fullColorEnabled = false;
 
-// Time-graph circular buffer (2段表示用に 20 秒分)
-const GRAPH_SECONDS = 20;
+// Time-graph circular buffer (3段表示用に 30 秒分)
+const GRAPH_SECONDS = 30;
 const GRAPH_FPS = 30;
 const GRAPH_POINTS = GRAPH_SECONDS * GRAPH_FPS;
-const POINTS_PER_ROW = GRAPH_POINTS / 2;
+const NUM_ROWS = 3;
+const POINTS_PER_ROW = GRAPH_POINTS / NUM_ROWS;
 const graphBuf = new Array(GRAPH_POINTS).fill(null); // null | { cents, inTune, name }
 let graphHead = 0;
 
@@ -117,17 +118,18 @@ function buildMeterTicks() {
     g.appendChild(line);
   }
 
-  // Pure intonation third markers (triangles pointing inward)
+  // Pure intonation third markers (triangles pointing inward, base on arc)
   // Major 3rd below root: -13.7¢  Minor 3rd above root: +15.6¢
   const thirdCents = [-13.7, 15.6];
+  const triR = r + 10; // base sits just outside the arc (r=120), tip points inward
   for (const c of thirdCents) {
     const aRad = (c / 50) * maxAngle * (Math.PI / 180);
     const sinA = Math.sin(aRad), cosA = Math.cos(aRad);
-    // Tip: 14px inward from arc
-    const tx = (cx + sinA * (r - 14)).toFixed(1);
-    const ty = (cy - cosA * (r - 14)).toFixed(1);
-    // Base: on the arc, ±5px tangential
-    const ox = cx + sinA * r, oy = cy - cosA * r;
+    // Tip: at the arc edge
+    const tx = (cx + sinA * r).toFixed(1);
+    const ty = (cy - cosA * r).toFixed(1);
+    // Base: 10px outside the arc, ±5px tangential
+    const ox = cx + sinA * triR, oy = cy - cosA * triR;
     const b1x = (ox + cosA * 5).toFixed(1);
     const b1y = (oy + sinA * 5).toFixed(1);
     const b2x = (ox - cosA * 5).toFixed(1);
@@ -237,11 +239,11 @@ function drawGraph() {
   const dotWeak   = bgStyle.getPropertyValue('--dot-weak').trim()     || '#bda692';
   const textCol   = bgStyle.getPropertyValue('--text-color').trim()   || '#333';
 
-  const rowH = h / 2;
+  const rowH = h / NUM_ROWS;
   const colW = w / POINTS_PER_ROW;
 
   // 行ごとの背景ガイド線
-  for (let row = 0; row < 2; row++) {
+  for (let row = 0; row < NUM_ROWS; row++) {
     const yOffset = row * rowH;
     const midY = yOffset + rowH / 2;
 
@@ -261,12 +263,13 @@ function drawGraph() {
     ctx.globalAlpha = 1;
   }
 
-  // 行の境界線（太め・高コントラストで２段を明確に分ける）
+  // 行の境界線（太め・高コントラストで３段を明確に分ける）
   ctx.strokeStyle = textCol;
   ctx.globalAlpha = 0.55;
   ctx.lineWidth = 2.5 * dpr;
   ctx.beginPath();
-  ctx.moveTo(0, rowH); ctx.lineTo(w, rowH);
+  ctx.moveTo(0, rowH);     ctx.lineTo(w, rowH);
+  ctx.moveTo(0, rowH * 2); ctx.lineTo(w, rowH * 2);
   ctx.stroke();
   ctx.globalAlpha = 1;
 
@@ -274,13 +277,15 @@ function drawGraph() {
   if (total === 0) return;
 
   // 位置計算ヘルパ: i (0..total-1, oldest..newest) → {row, xInRow}
-  // 上段=最新の POINTS_PER_ROW 個, 下段=その前の POINTS_PER_ROW 個
+  // 上段=最新の POINTS_PER_ROW 個, 中段=その前, 下段=さらに前
   function posOf(i) {
     const ageFromNewest = total - 1 - i;
     if (ageFromNewest < POINTS_PER_ROW) {
       return { row: 0, xInRow: POINTS_PER_ROW - 1 - ageFromNewest };
-    } else {
+    } else if (ageFromNewest < 2 * POINTS_PER_ROW) {
       return { row: 1, xInRow: (2 * POINTS_PER_ROW - 1) - ageFromNewest };
+    } else {
+      return { row: 2, xInRow: (3 * POINTS_PER_ROW - 1) - ageFromNewest };
     }
   }
 

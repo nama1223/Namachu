@@ -160,6 +160,11 @@
   font-weight: bold;
   font-size: 0.9rem;
 }
+.scale-compare-btns {
+  display: flex;
+  gap: 6px;
+}
+
 .scale-export-btn {
   padding: 4px 12px;
   border-radius: 6px;

@@ -149,7 +149,7 @@
   align-items: stretch;
   gap: 4px;
   margin-top: 10px;
-  height: 180px;
+  height: 270px;
 }
 .time-graph {
   flex: 1;
@@ -194,6 +194,12 @@
 .concert-pitch-badge {
   opacity: 0.6;
 }
+.tuner-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .full-color-btn {
   font-size: 0.70rem;
   font-weight: bold;

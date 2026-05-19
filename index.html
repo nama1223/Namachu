@@ -51,9 +51,12 @@
   <div id="tab-tuner" class="tab-content active">
     <div class="header-row">
       <h1 id="appTitle">NamaChu</h1>
-      <div class="mic-btn-wrap">
-        <button class="mic-btn" id="micToggleBtn" onclick="toggleMic()">🎤</button>
-        <span class="mic-status-text" id="micStatusText">OFF</span>
+      <div class="tuner-header-right">
+        <button class="full-color-btn" id="fullColorBtn" onclick="toggleFullColor()" title="全面カラー" data-i18n="btn_full_color">全面色</button>
+        <div class="mic-btn-wrap">
+          <button class="mic-btn" id="micToggleBtn" onclick="toggleMic()">🎤</button>
+          <span class="mic-status-text" id="micStatusText">OFF</span>
+        </div>
       </div>
     </div>
 
@@ -97,7 +100,6 @@
       <span class="instrument-badge" id="instrumentBadge" onclick="switchTab('settings')"></span>
       <div class="tuner-footer-right">
         <span class="concert-pitch-badge" id="concertPitchBadge">A = 442 Hz</span>
-        <button class="full-color-btn" id="fullColorBtn" onclick="toggleFullColor()" title="全面カラー" data-i18n="btn_full_color">全面色</button>
       </div>
     </div>
   </div>
@@ -193,7 +195,10 @@
     <div class="scale-compare-section" id="scaleCompareSection">
       <div class="scale-compare-header">
         <span data-i18n="label_compare">比較</span>
-        <button class="scale-export-btn" onclick="exportScaleData()" data-i18n="btn_export">エクスポート</button>
+        <div class="scale-compare-btns">
+          <button class="scale-export-btn" onclick="exportScaleData()" data-i18n="btn_scale_export">保存</button>
+          <button class="scale-export-btn" onclick="importScaleData()" data-i18n="btn_scale_import">読み込み</button>
+        </div>
       </div>
       <div id="scaleDataList"></div>
     </div>

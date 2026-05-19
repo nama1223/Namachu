@@ -303,6 +303,41 @@ export function exportScaleData() {
   showToast(t('toast_export_done'));
 }
 
+export function importScaleData() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.onchange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const obj = JSON.parse(ev.target.result);
+        if (!Array.isArray(obj.datasets)) throw new Error('invalid');
+        // Merge: avoid duplicates by name+timestamp
+        const existingKeys = new Set(savedDatasets.map(d => d.name + '|' + d.savedAt));
+        let added = 0;
+        for (const ds of obj.datasets) {
+          const key = ds.name + '|' + ds.savedAt;
+          if (!existingKeys.has(key)) {
+            savedDatasets.push(ds);
+            existingKeys.add(key);
+            added++;
+          }
+        }
+        lsSet('scaleDatasets', savedDatasets);
+        renderChart();
+        showToast(t('toast_import_done'));
+      } catch {
+        showToast(t('toast_import_error'));
+      }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
 export function deleteDataset(idx) {
   savedDatasets.splice(idx, 1);
   lsSet('scaleDatasets', savedDatasets);
