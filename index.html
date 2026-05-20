@@ -221,6 +221,20 @@
       <h1 data-i18n="tab_settings">設定</h1>
     </div>
 
+    <!-- スリープ防止 -->
+    <div class="wakelock-panel" id="wakeLockPanel">
+      <div>
+        <div class="wakelock-label"><span id="wakeLockEmoji">😴</span> <span data-i18n="wakelock_label">スリープ防止</span></div>
+        <div class="wakelock-status" id="wakeLockStatus"></div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="wakeLockToggle" onchange="onWakeLockToggle()">
+        <span class="toggle-slider" id="wakeLockSlider">
+          <span class="toggle-thumb" id="wakeLockThumb"></span>
+        </span>
+      </label>
+    </div>
+
     <!-- 楽器 -->
     <div class="setting-card" id="card-instrument">
       <div class="setting-card-header" onclick="toggleCard('card-instrument')">

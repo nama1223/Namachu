@@ -403,6 +403,73 @@ export function refreshSettingsUI() {
   refreshMicDevices(); // async, fire-and-forget
 }
 
+// ---- スリープ防止 (Wake Lock) ----
+let _wakeLock = null;
+const _wakeLockSupported = ('wakeLock' in navigator);
+const WAKELOCK_KEY = 'namaChu_wakeLock';
+
+export function initWakeLock() {
+  const toggle = document.getElementById('wakeLockToggle');
+  const panel  = document.getElementById('wakeLockPanel');
+
+  if (!_wakeLockSupported) {
+    if (panel)  panel.style.opacity = '0.4';
+    if (toggle) toggle.disabled = true;
+    const s = document.getElementById('wakeLockStatus');
+    if (s) s.textContent = t('wakelock_unsupported');
+    return;
+  }
+
+  const enabled = localStorage.getItem(WAKELOCK_KEY) === 'true';
+  if (toggle) toggle.checked = enabled;
+  _updateWakeLockUI(enabled);
+  if (enabled) _requestWakeLock();
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const tog = document.getElementById('wakeLockToggle');
+      if (tog && tog.checked) _requestWakeLock();
+    }
+  });
+}
+
+async function _requestWakeLock() {
+  if (!_wakeLockSupported || _wakeLock) return;
+  try {
+    _wakeLock = await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release', () => { _wakeLock = null; _updateWakeLockUI(false); });
+    _updateWakeLockUI(true);
+  } catch(e) {
+    _wakeLock = null;
+    _updateWakeLockUI(false);
+  }
+}
+
+function _releaseWakeLock() {
+  if (_wakeLock) _wakeLock.release();
+  _wakeLock = null;
+  _updateWakeLockUI(false);
+}
+
+function _updateWakeLockUI(active) {
+  const status = document.getElementById('wakeLockStatus');
+  const emoji  = document.getElementById('wakeLockEmoji');
+  const slider = document.getElementById('wakeLockSlider');
+  const thumb  = document.getElementById('wakeLockThumb');
+  if (status) status.textContent = t(active ? 'wakelock_on' : 'wakelock_off');
+  if (emoji)  emoji.textContent  = active ? '🥺' : '😴';
+  if (slider) slider.classList.toggle('on', active);
+  if (thumb)  thumb.classList.toggle('on', active);
+}
+
+export function onWakeLockToggle() {
+  const toggle = document.getElementById('wakeLockToggle');
+  const on = toggle?.checked ?? false;
+  localStorage.setItem(WAKELOCK_KEY, on ? 'true' : 'false');
+  _updateWakeLockUI(on);
+  if (on) _requestWakeLock(); else _releaseWakeLock();
+}
+
 // ---- 自動校正からの設定適用 ----
 export function applyCalibratedSensitivity(minVolume, clarity, silenceGrace) {
   _settings.minVolume = minVolume;
