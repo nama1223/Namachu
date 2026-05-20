@@ -804,6 +804,12 @@ function _renderList() {
         ctx.fillText(label, cx + 4 * dpr, baseY);
         ctx.globalAlpha = 1;
       } else {
+        // データあり: セル背景をわずかに強調して測定済みを示す
+        ctx.fillStyle = textColor;
+        ctx.globalAlpha = 0.08;
+        ctx.fillRect(cx, ry, colW, rowH);
+        ctx.globalAlpha = 1;
+
         // データあり: 音名（左）＋ cents（右）
         ctx.font = `bold ${fontSize}px sans-serif`;
         ctx.textAlign = 'left';
