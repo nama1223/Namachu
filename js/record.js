@@ -414,6 +414,10 @@ function stopPlayback() {
   onPlaybackEnd();
 }
 
+export function stopPlaybackIfPlaying() {
+  if (playing) stopPlayback();
+}
+
 // ---- Clear ----
 export function clearRecording() {
   stopPlayback();

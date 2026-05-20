@@ -3,8 +3,8 @@
 import { initI18n, setLang, applyI18n, t } from './i18n.js';
 import { showToast, closeModal, openModal, getInstrument, lsSet } from './utils.js';
 import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold, resumeAudioIfSuspended } from './audio.js';
-import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, toggleFullColor, toggleRefPitch, stepRefPitch } from './tuner.js';
-import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook } from './record.js';
+import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, toggleFullColor, toggleRefPitch, stepRefPitch, stopRefPitchTone } from './tuner.js';
+import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook, stopPlaybackIfPlaying } from './record.js';
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, importScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset, switchScaleView } from './scale.js';
 import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
 import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
@@ -219,6 +219,48 @@ function exposeGlobals() {
 
   // Modal helpers
   g.closeModal = closeModal;
+
+  // NamaSound+ 連携
+  g.pauseAllSound = pauseAllSound;
+}
+
+// ---- 全音停止（NamaSound+ からの pauseAll メッセージ用） ----
+function pauseAllSound() {
+  stopRefPitchTone();      // 基準音
+  stopPlaybackIfPlaying(); // 記録タブの再生
+}
+
+// ---- NamaSound+ 親フレーム連携 ----
+const PARENT_ORIGIN = 'https://nama1223.github.io';
+
+window.addEventListener('message', (event) => {
+  if (event.origin !== PARENT_ORIGIN) return;
+  const msg = event.data;
+  if (!msg || typeof msg !== 'object') return;
+
+  switch (msg.type) {
+    case 'setLanguage':
+      setLang(msg.lang);
+      applyI18n();
+      refreshSettingsUI();
+      break;
+    case 'setWakeLock': {
+      const toggle = document.getElementById('wakeLockToggle');
+      if (toggle && toggle.checked !== !!msg.enabled) {
+        toggle.checked = !!msg.enabled;
+        onWakeLockToggle();
+      }
+      break;
+    }
+    case 'pauseAll':
+      pauseAllSound();
+      break;
+  }
+});
+
+// 親に「準備完了」を通知（言語/WakeLock の初期同期トリガー用）
+if (window.parent !== window) {
+  window.parent.postMessage({ type: 'childReady', app: location.pathname }, '*');
 }
 
 document.addEventListener('DOMContentLoaded', init);

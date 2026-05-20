@@ -397,6 +397,10 @@ export function toggleRefPitch() {
   else _startRefPitch();
 }
 
+export function stopRefPitchTone() {
+  if (_refPlaying) _stopRefPitch();
+}
+
 export function stepRefPitch(delta) {
   const next = Math.max(REF_PITCH_LO, Math.min(REF_PITCH_HI, _refMidi + delta));
   if (next === _refMidi) return;
