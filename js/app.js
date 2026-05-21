@@ -3,10 +3,10 @@
 import { initI18n, setLang, applyI18n, t } from './i18n.js';
 import { showToast, closeModal, openModal, getInstrument, lsSet } from './utils.js';
 import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold, resumeAudioIfSuspended } from './audio.js';
-import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, toggleFullColor, toggleRefPitch, stepRefPitch, stopRefPitchTone } from './tuner.js';
-import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook, stopPlaybackIfPlaying } from './record.js';
-import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, importScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, confirmScaleDataset, switchScaleView } from './scale.js';
-import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
+import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, setTunerInTuneCents, toggleFullColor, toggleRefPitch, stepRefPitch, stopRefPitchTone } from './tuner.js';
+import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook, setRecordInTuneCents, stopPlaybackIfPlaying } from './record.js';
+import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, importScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, setScaleInTuneCents, confirmScaleDataset, switchScaleView } from './scale.js';
+import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, adjustInTuneCents, getInTuneCents, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
 import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
 
 // ---- Tab management ----
@@ -70,21 +70,26 @@ function onSettingsChange(s) {
   setMinRms(_minRms);
   setClarityThreshold(_clarityThreshold);
 
+  const itc = getInTuneCents();
+
   setTunerConcertPitch(cp);
   setTunerNoteStyle(ns);
   setTunerInstrument(inst);
   setTunerClarityThreshold(_clarityThreshold);
   setTunerDisplayTrans(getDisplayTrans().trans);
+  setTunerInTuneCents(itc);
 
   setRecordConcertPitch(cp);
   setRecordNoteStyle(ns);
   setRecordInstrument(inst);
   setRecordSilenceGrace(getSilenceGrace());
+  setRecordInTuneCents(itc);
 
   setScaleConcertPitch(cp);
   setScaleNoteStyle(ns);
   setScaleInstrument(inst);
   setScaleClarityThreshold(_clarityThreshold);
+  setScaleInTuneCents(itc);
 }
 
 // ---- Bootstrap ----
@@ -113,6 +118,7 @@ function init() {
     noteStyle: s.noteStyle,
   });
   setRecordSilenceGrace(getSilenceGrace());
+  setRecordInTuneCents(getInTuneCents());
 
   initScale({
     instrument: inst,
@@ -120,6 +126,8 @@ function init() {
     noteStyle: s.noteStyle,
     clarityThreshold: clarityToThreshold(s.clarity),
   });
+  setScaleInTuneCents(getInTuneCents());
+  setTunerInTuneCents(getInTuneCents());
 
   // Recording reliability: resume AudioContext before recording, repair on freeze
   setRecordPreStartHook(async () => {
@@ -172,6 +180,7 @@ function exposeGlobals() {
   g.onFamilyChange = onFamilyChange;
   g.onInstrumentChange = onInstrumentChange;
   g.adjustConcertPitch = adjustConcertPitch;
+  g.adjustInTuneCents = adjustInTuneCents;
   g.onNoteStyleChange = onNoteStyleChange;
   g.onDisplayTransChange = onDisplayTransChange;
   g.onMicDeviceChange = onMicDeviceChange;

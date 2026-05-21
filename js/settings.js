@@ -15,6 +15,7 @@ const DEFAULTS = {
   minVolume: 10,
   clarity: 85,
   silenceGrace: 100, // ms; 持続音中のドロップアウトをこの時間まで許容
+  inTuneCents: 5,   // ±N¢ 以内を「合っている」と判定
   collapsedCards: [],
 };
 
@@ -213,6 +214,16 @@ export function adjustConcertPitch(delta) {
   saveAndNotify();
 }
 
+// ---- In-tune tolerance ----
+export function adjustInTuneCents(delta) {
+  _settings.inTuneCents = Math.max(1, Math.min(20, (_settings.inTuneCents ?? 5) + delta));
+  const el = document.getElementById('inTuneCentsVal');
+  if (el) el.textContent = `±${_settings.inTuneCents} ¢`;
+  saveAndNotify();
+}
+
+export function getInTuneCents() { return _settings.inTuneCents ?? 5; }
+
 // ---- Note style ----
 export function onNoteStyleChange() {
   const checked = document.querySelector('input[name="noteStyle"]:checked');
@@ -392,6 +403,9 @@ function restoreUI() {
 
   document.getElementById('concertPitchVal').textContent = _settings.concertPitch;
   document.getElementById('concertPitchBadge').textContent = `A = ${_settings.concertPitch} Hz`;
+
+  const itcEl = document.getElementById('inTuneCentsVal');
+  if (itcEl) itcEl.textContent = `±${_settings.inTuneCents ?? 5} ¢`;
 
   const radio = document.querySelector(`input[name="noteStyle"][value="${_settings.noteStyle}"]`);
   if (radio) radio.checked = true;

@@ -15,6 +15,7 @@ let _instrument = null;
 let _concertPitch = 440;
 let _noteStyle = 'abc';
 let _silenceGraceMs = 100; // 持続音中のドロップアウト許容時間
+let _inTuneCents = 5;
 
 let recording = false;
 let playing = false;
@@ -73,6 +74,7 @@ export function setRecordInstrument(inst) { _instrument = inst; buildPitchAxis()
 export function setRecordConcertPitch(hz) { _concertPitch = hz; }
 export function setRecordNoteStyle(s) { _noteStyle = s; buildPitchAxis(); }
 export function setRecordSilenceGrace(ms) { _silenceGraceMs = ms; }
+export function setRecordInTuneCents(n) { _inTuneCents = n; }
 export function setRecordRepairCallback(fn) { _repairCallback = fn; }
 export function setRecordPreStartHook(fn) { _preStartHook = fn; }
 
@@ -575,14 +577,14 @@ function drawCanvas() {
       if (midiF < loMidi - 0.5 || midiF > hiMidi + 0.5) continue;
       const y = h - (midiF - loMidi + 0.5) / noteRange * h;
       const centsF = (midiF - Math.round(midiF)) * 100;
-      const color = Math.abs(centsF) <= 5 ? inTuneColor : centsF > 0 ? sharpColor : flatColor;
+      const color = Math.abs(centsF) <= _inTuneCents ? inTuneColor : centsF > 0 ? sharpColor : flatColor;
       pts.push({ x, y, color });
     }
     if (pts.length === 0) return;
 
     ctx.save();
     ctx.globalAlpha = alpha;
-    ctx.lineWidth = 2.5 * dpr;
+    ctx.lineWidth = 1 * dpr;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 

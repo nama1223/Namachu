@@ -84,6 +84,9 @@ export function setScaleInstrument(inst) { _instrument = inst; renderChart(); }
 export function setScaleConcertPitch(hz) { _concertPitch = hz; }
 export function setScaleNoteStyle(s) { _noteStyle = s; }
 export function setScaleClarityThreshold(v) { _clarityThreshold = v; }
+
+let _inTuneCents = 5;
+export function setScaleInTuneCents(n) { _inTuneCents = n; renderChart(); }
 // onScaleInstrumentChange は settings.js で定義・app.js でグローバル登録
 
 // ---- Measure control ----
@@ -511,7 +514,7 @@ function _drawMiniTuner() {
     const x = offsetX + i * colW;
     const cents = clamp(entry.cents, -YMAX, YMAX);
     const y = midY - (cents / YMAX) * (plotH / 2);
-    const color = Math.abs(cents) <= 5 ? inTune : cents > 0 ? sharp : flat;
+    const color = Math.abs(cents) <= _inTuneCents ? inTune : cents > 0 ? sharp : flat;
 
     if (prevPt) {
       ctx.strokeStyle = prevPt.color;
@@ -823,7 +826,7 @@ function _renderList() {
         if (allVals.length === 1) {
           const v = allVals[0];
           const sign = v.cents >= 0 ? '+' : '';
-          ctx.fillStyle = Math.abs(v.cents) <= 5 ? inTuneCol : v.cents > 0 ? sharpCol : flatCol;
+          ctx.fillStyle = Math.abs(v.cents) <= _inTuneCents ? inTuneCol : v.cents > 0 ? sharpCol : flatCol;
           ctx.fillText(`${sign}${v.cents}`, rightX, baseY);
         } else {
           // 複数: フォントを縮小して上下に配置
@@ -831,7 +834,7 @@ function _renderList() {
           ctx.font = `bold ${smSize}px sans-serif`;
           allVals.forEach((v, vi) => {
             const sign = v.cents >= 0 ? '+' : '';
-            ctx.fillStyle = Math.abs(v.cents) <= 5 ? inTuneCol : v.cents > 0 ? sharpCol : flatCol;
+            ctx.fillStyle = Math.abs(v.cents) <= _inTuneCents ? inTuneCol : v.cents > 0 ? sharpCol : flatCol;
             const ty = ry + rowH * (0.28 + vi * (0.55 / Math.max(1, allVals.length - 1)));
             ctx.fillText(`${sign}${v.cents}`, rightX, ty + smSize * 0.35);
           });

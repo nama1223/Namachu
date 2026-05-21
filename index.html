@@ -277,6 +277,14 @@
           <button onclick="adjustConcertPitch(+1)">＋</button>
         </div>
         <div style="text-align:center;font-size:0.75rem;opacity:0.6;margin-top:4px;">Hz (A4)</div>
+        <div class="setting-row" style="margin-top:12px;">
+          <label data-i18n="label_in_tune_range">チューニング許容範囲</label>
+          <div class="stepper-ui" style="justify-content:flex-end;flex:0 0 auto;">
+            <button onclick="adjustInTuneCents(-1)">−</button>
+            <span id="inTuneCentsVal">±5 ¢</span>
+            <button onclick="adjustInTuneCents(+1)">＋</button>
+          </div>
+        </div>
       </div>
     </div>
 

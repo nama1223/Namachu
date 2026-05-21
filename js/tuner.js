@@ -9,6 +9,7 @@ let _instrument = null;
 let _displayTrans = 0; // semitones: displayMidi = concertMidi - _displayTrans
 let _clarityThreshold = 0.85;
 let _fullColorEnabled = false;
+let _inTuneCents = 5;
 
 // ---- Reference pitch state ----
 const REF_PITCH_LO = 48; // C3
@@ -63,6 +64,7 @@ export function setTunerNoteStyle(s) { _noteStyle = s; _updateRefPitchDisplay();
 export function setTunerInstrument(inst) { _instrument = inst; }
 export function setTunerDisplayTrans(semitones) { _displayTrans = semitones; _updateRefPitchDisplay(); }
 export function setTunerClarityThreshold(v) { _clarityThreshold = v; }
+export function setTunerInTuneCents(n) { _inTuneCents = n; }
 
 export function toggleFullColor() {
   _fullColorEnabled = !_fullColorEnabled;
@@ -97,7 +99,7 @@ export function onPitch(freq, clarity, rms) {
   const dispInfo = midiToNoteInfo(displayMidi);
 
   const name = noteName(dispInfo.note, dispInfo.octave, _noteStyle, false);
-  const inTune = Math.abs(cents) <= 5;
+  const inTune = Math.abs(cents) <= _inTuneCents;
 
   pushGraph({ cents, inTune, name: name + dispInfo.octave });
   animateNeedleTo(cents);
@@ -172,7 +174,7 @@ function animateNeedleTo(targetCents) {
   const needle = document.getElementById('meterNeedle');
   if (needle) {
     needle.style.transform = `rotate(${angle}deg)`;
-    const inTune = Math.abs(needleCents) <= 5;
+    const inTune = Math.abs(needleCents) <= _inTuneCents;
     needle.classList.toggle('in-tune', inTune);
   }
 }
