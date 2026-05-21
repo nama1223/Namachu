@@ -69,6 +69,7 @@ function _buildFamilyHtml(lang) {
 const _SELECT_PAIRS = [
   ['familySelect',      'instrumentSelect'],
   ['scaleFamilySelect', 'scaleMeasureInstrument'],
+  ['recordFamilySelect','recordInstrumentSelect'],
 ];
 
 function populateInstrumentSelect() {
@@ -92,10 +93,13 @@ export function onFamilyChange() {
   const familyId = famSel.value;
   const newInstId = _refillInstsByFamily('instrumentSelect', familyId, null);
   _settings.instrumentId = newInstId;
-  // スケールタブも同期
+  // スケール・記録タブも同期
   const scaleFamSel = document.getElementById('scaleFamilySelect');
   if (scaleFamSel) scaleFamSel.value = familyId;
   _refillInstsByFamily('scaleMeasureInstrument', familyId, newInstId);
+  const recFamSel = document.getElementById('recordFamilySelect');
+  if (recFamSel) recFamSel.value = familyId;
+  _refillInstsByFamily('recordInstrumentSelect', familyId, newInstId);
   updateInstrumentInfo();
   saveAndNotify();
 }
@@ -107,6 +111,8 @@ export function onInstrumentChange() {
   _settings.instrumentId = sel.value;
   const scaleInstSel = document.getElementById('scaleMeasureInstrument');
   if (scaleInstSel) scaleInstSel.value = _settings.instrumentId;
+  const recInstSel = document.getElementById('recordInstrumentSelect');
+  if (recInstSel) recInstSel.value = _settings.instrumentId;
   updateInstrumentInfo();
   saveAndNotify();
 }
@@ -118,10 +124,13 @@ export function onScaleFamilyChange() {
   const familyId = famSel.value;
   const newInstId = _refillInstsByFamily('scaleMeasureInstrument', familyId, null);
   _settings.instrumentId = newInstId;
-  // 設定タブも同期
+  // 設定・記録タブも同期
   const settingsFamSel = document.getElementById('familySelect');
   if (settingsFamSel) settingsFamSel.value = familyId;
   _refillInstsByFamily('instrumentSelect', familyId, newInstId);
+  const recFamSel = document.getElementById('recordFamilySelect');
+  if (recFamSel) recFamSel.value = familyId;
+  _refillInstsByFamily('recordInstrumentSelect', familyId, newInstId);
   updateInstrumentInfo();
   saveAndNotify();
 }
@@ -133,6 +142,39 @@ export function onScaleInstrumentChange() {
   _settings.instrumentId = sel.value;
   const settingsInstSel = document.getElementById('instrumentSelect');
   if (settingsInstSel) settingsInstSel.value = _settings.instrumentId;
+  const recInstSel = document.getElementById('recordInstrumentSelect');
+  if (recInstSel) recInstSel.value = _settings.instrumentId;
+  updateInstrumentInfo();
+  saveAndNotify();
+}
+
+// 記録タブ: ファミリー変更
+export function onRecordFamilyChange() {
+  const famSel = document.getElementById('recordFamilySelect');
+  if (!famSel) return;
+  const familyId = famSel.value;
+  const newInstId = _refillInstsByFamily('recordInstrumentSelect', familyId, null);
+  _settings.instrumentId = newInstId;
+  // 設定・スケールタブも同期
+  const settingsFamSel = document.getElementById('familySelect');
+  if (settingsFamSel) settingsFamSel.value = familyId;
+  _refillInstsByFamily('instrumentSelect', familyId, newInstId);
+  const scaleFamSel = document.getElementById('scaleFamilySelect');
+  if (scaleFamSel) scaleFamSel.value = familyId;
+  _refillInstsByFamily('scaleMeasureInstrument', familyId, newInstId);
+  updateInstrumentInfo();
+  saveAndNotify();
+}
+
+// 記録タブ: 楽器変更
+export function onRecordInstrumentChange() {
+  const sel = document.getElementById('recordInstrumentSelect');
+  if (!sel) return;
+  _settings.instrumentId = sel.value;
+  const settingsInstSel = document.getElementById('instrumentSelect');
+  if (settingsInstSel) settingsInstSel.value = _settings.instrumentId;
+  const scaleInstSel = document.getElementById('scaleMeasureInstrument');
+  if (scaleInstSel) scaleInstSel.value = _settings.instrumentId;
   updateInstrumentInfo();
   saveAndNotify();
 }
@@ -158,6 +200,9 @@ function updateInstrumentInfo() {
 
   const badge = document.getElementById('instrumentBadge');
   if (badge) badge.textContent = lang === 'ja' ? inst.nameJa : inst.nameEn;
+
+  const recordBtn = document.getElementById('recordInstrumentBtn');
+  if (recordBtn) recordBtn.textContent = lang === 'ja' ? inst.nameJa : inst.nameEn;
 }
 
 // ---- Concert pitch ----

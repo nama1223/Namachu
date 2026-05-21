@@ -119,6 +119,7 @@
   <div id="tab-record" class="tab-content">
     <div class="header-row">
       <h1 data-i18n="tab_record">音階記録</h1>
+      <button class="record-inst-btn" id="recordInstrumentBtn" onclick="openModal('recordInstrumentModal')"></button>
       <div class="record-header-btns">
         <button class="icon-btn" id="saveRecordBtn" onclick="saveRecording()" title="保存">💾</button>
         <button class="icon-btn" id="loadRecordBtn" onclick="showRecordList()" title="読み込み">📂</button>
@@ -387,6 +388,20 @@
 </div>
 
 <div class="ad-spacer"></div>
+
+<!-- ===== 楽器選択モーダル（音階記録タブ） ===== -->
+<div class="modal-overlay" id="recordInstrumentModal" onclick="if(event.target===this)closeModal('recordInstrumentModal')">
+  <div class="modal-content">
+    <h2 data-i18n="label_instrument">楽器</h2>
+    <div class="instrument-dual-select" style="margin-bottom:16px;">
+      <select id="recordFamilySelect" onchange="onRecordFamilyChange()"></select>
+      <select id="recordInstrumentSelect" onchange="onRecordInstrumentChange()"></select>
+    </div>
+    <div class="modal-buttons">
+      <button onclick="closeModal('recordInstrumentModal')" data-i18n="btn_close">閉じる</button>
+    </div>
+  </div>
+</div>
 
 <!-- ===== ヘルプモーダル（音階測定） ===== -->
 <div class="modal-overlay" id="scaleHelpModal" onclick="if(event.target===this)closeModal('scaleHelpModal')">
