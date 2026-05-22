@@ -36,8 +36,9 @@ let _silenceStartMs = null;   // 直前まで音があり無音に入った時�
 
 // ---- Zoom / scroll ----
 const BASE_VIEW_MS = 8000;
-let _zoomLevel = 1;        // 1 | 2 | 4 | 8
-let _scrollNoteOffset = 0; // 下端からの音符オフセット（縦スクロール）
+const ZOOM_STEPS = [1, 1.3, 1.6, 2.0, 4.0]; // 100%, 130%, 160%, 200%, 400%
+let _zoomIdx = 0;          // ZOOM_STEPS のインデックス
+let _scrollNoteOffset = 0; // 下端からの音符オフセット（整数スナップ）
 
 // ---- Drag scroll ----
 let _dragActive = false;
@@ -93,33 +94,36 @@ export function setRecordRepairCallback(fn) { _repairCallback = fn; }
 export function setRecordPreStartHook(fn) { _preStartHook = fn; }
 
 // ---- Zoom ----
+function _zoomFactor() { return ZOOM_STEPS[_zoomIdx]; }
+
 function _getVisibleNoteCount() {
   if (!_instrument) return 1;
   const noteRange = _instrument.hiMidi - _instrument.loMidi + 1;
-  return Math.max(1, Math.ceil(noteRange / _zoomLevel));
+  return Math.max(1, Math.ceil(noteRange / _zoomFactor()));
 }
 
 function _clampNoteScroll() {
   if (!_instrument) return;
   const noteRange = _instrument.hiMidi - _instrument.loMidi + 1;
   const maxScroll = Math.max(0, noteRange - _getVisibleNoteCount());
-  _scrollNoteOffset = Math.max(0, Math.min(_scrollNoteOffset, maxScroll));
+  // 常に整数スナップ → キャンバスと音階軸が一致する
+  _scrollNoteOffset = Math.round(Math.max(0, Math.min(_scrollNoteOffset, maxScroll)));
 }
 
 export function zoomRecordIn() {
-  if (_zoomLevel >= 8) return;
-  _zoomLevel = Math.min(8, _zoomLevel * 2);
-  viewMs = BASE_VIEW_MS / _zoomLevel;
+  if (_zoomIdx >= ZOOM_STEPS.length - 1) return;
+  _zoomIdx++;
+  viewMs = BASE_VIEW_MS / _zoomFactor();
   _clampNoteScroll();
   buildPitchAxis();
   _updateZoomBtns();
 }
 
 export function zoomRecordOut() {
-  if (_zoomLevel <= 1) return;
-  _zoomLevel = Math.max(1, Math.floor(_zoomLevel / 2));
-  viewMs = BASE_VIEW_MS / _zoomLevel;
-  if (_zoomLevel === 1) _scrollNoteOffset = 0;
+  if (_zoomIdx <= 0) return;
+  _zoomIdx--;
+  viewMs = BASE_VIEW_MS / _zoomFactor();
+  if (_zoomIdx === 0) _scrollNoteOffset = 0;
   _clampNoteScroll();
   buildPitchAxis();
   _updateZoomBtns();
@@ -129,9 +133,9 @@ function _updateZoomBtns() {
   const btnIn  = document.getElementById('zoomInBtn');
   const btnOut = document.getElementById('zoomOutBtn');
   const label  = document.getElementById('zoomLabel');
-  if (btnIn)  btnIn.disabled  = _zoomLevel >= 8;
-  if (btnOut) btnOut.disabled = _zoomLevel <= 1;
-  if (label)  label.textContent = `${_zoomLevel * 100}%`;
+  if (btnIn)  btnIn.disabled  = _zoomIdx >= ZOOM_STEPS.length - 1;
+  if (btnOut) btnOut.disabled = _zoomIdx <= 0;
+  if (label)  label.textContent = `${Math.round(_zoomFactor() * 100)}%`;
 }
 
 // ---- Seek to start ----
@@ -191,16 +195,18 @@ function _initDragScroll() {
     const msPerPx = viewMs / (canvas.offsetWidth || 1);
     const maxScrollMs = Math.max(0, getTotalDuration() - viewMs * 0.1);
     scrollMs = Math.max(0, Math.min(_dragStartScrollMs - dx * msPerPx, maxScrollMs));
-    // 縦スクロール（ズーム時のみ）
-    if (_zoomLevel > 1 && _instrument) {
+    // 縦スクロール（ズーム時のみ）— 整数スナップでキャンバスと軸を一致させる
+    if (_zoomIdx > 0 && _instrument) {
       const dy = clientY - _dragStartY;
       const visibleNotes = _getVisibleNoteCount();
       const noteRange = _instrument.hiMidi - _instrument.loMidi + 1;
       const notesPerPx = visibleNotes / (canvas.offsetHeight || 1);
       const maxNoteScroll = Math.max(0, noteRange - visibleNotes);
-      // 上にドラッグ → 高音方向にスクロール
-      _scrollNoteOffset = Math.max(0, Math.min(_dragStartNoteOffset + dy * notesPerPx, maxNoteScroll));
-      buildPitchAxis();
+      const next = Math.round(Math.max(0, Math.min(_dragStartNoteOffset + dy * notesPerPx, maxNoteScroll)));
+      if (next !== _scrollNoteOffset) {
+        _scrollNoteOffset = next;
+        buildPitchAxis();
+      }
     }
     updateTimeBar(scrollMs + viewMs * 0.75, getTotalDuration());
   }

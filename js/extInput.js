@@ -65,8 +65,9 @@ function _onMidi(msg) {
 // ---- Key listener ----
 function _onKeyDown(e) {
   if (_detectingFor) {
-    // モーダル内のボタン操作（Enter/Escape）は除外
-    if (e.target && e.target.tagName === 'BUTTON') return;
+    // モーダル内ボタンで Enter/Space が押された場合のみスルー（ボタン click として処理させる）
+    const inModalBtn = e.target?.closest('#extInputModal') && e.target.tagName === 'BUTTON';
+    if (inModalBtn && (e.code === 'Enter' || e.code === 'Space')) return;
     if (e.code === 'Escape') { closeExtInputModal(); return; }
     const label = _keyLabel(e.code, e.key);
     _showDetected({ type: 'key', code: e.code, key: e.key, label });
@@ -124,6 +125,8 @@ export function closeExtInputModal() {
 export function retryExtInput() {
   _pendingDetected = null;
   _setModalState('waiting');
+  // ボタンのフォーカスを外してキー入力をすぐ検出できるようにする
+  if (document.activeElement?.tagName === 'BUTTON') document.activeElement.blur();
 }
 
 export function saveExtInput() {
