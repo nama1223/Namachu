@@ -34,10 +34,23 @@ let _freqEma = null;          // 周波数の指数移動平均（オクター�
 let _octaveShiftCount = 0;    // オクターヴずれが何フレーム連続したか
 let _silenceStartMs = null;   // 直前まで音があり無音に入った時刻（猶予判定用）
 
+// ---- Zoom / scroll ----
+const BASE_VIEW_MS = 8000;
+let _zoomLevel = 1;        // 1 | 2 | 4 | 8
+let _scrollNoteOffset = 0; // 下端からの音符オフセット（縦スクロール）
+
 // ---- Drag scroll ----
 let _dragActive = false;
 let _dragStartX = 0;
+let _dragStartY = 0;
 let _dragStartScrollMs = 0;
+let _dragStartNoteOffset = 0;
+
+// ---- Tap-to-seek ----
+let _pointerDownX = 0;
+let _pointerDownY = 0;
+let _pointerDownTime = 0;
+let _seekMs = null; // タップした位置の時間（ms）
 
 // ---- Watchdog ----
 let _lastAudioFrameMs = 0;    // onRecordPitch が最後に呼ばれた時刻
@@ -67,6 +80,7 @@ export function initRecord(opts = {}) {
   window.addEventListener('resize', resizeCanvas);
   buildPitchAxis();
   _initDragScroll();
+  _updateZoomBtns();
   startDrawLoop();
 }
 
@@ -78,6 +92,54 @@ export function setRecordInTuneCents(n) { _inTuneCents = n; }
 export function setRecordRepairCallback(fn) { _repairCallback = fn; }
 export function setRecordPreStartHook(fn) { _preStartHook = fn; }
 
+// ---- Zoom ----
+function _getVisibleNoteCount() {
+  if (!_instrument) return 1;
+  const noteRange = _instrument.hiMidi - _instrument.loMidi + 1;
+  return Math.max(1, Math.ceil(noteRange / _zoomLevel));
+}
+
+function _clampNoteScroll() {
+  if (!_instrument) return;
+  const noteRange = _instrument.hiMidi - _instrument.loMidi + 1;
+  const maxScroll = Math.max(0, noteRange - _getVisibleNoteCount());
+  _scrollNoteOffset = Math.max(0, Math.min(_scrollNoteOffset, maxScroll));
+}
+
+export function zoomRecordIn() {
+  if (_zoomLevel >= 8) return;
+  _zoomLevel = Math.min(8, _zoomLevel * 2);
+  viewMs = BASE_VIEW_MS / _zoomLevel;
+  _clampNoteScroll();
+  buildPitchAxis();
+  _updateZoomBtns();
+}
+
+export function zoomRecordOut() {
+  if (_zoomLevel <= 1) return;
+  _zoomLevel = Math.max(1, Math.floor(_zoomLevel / 2));
+  viewMs = BASE_VIEW_MS / _zoomLevel;
+  if (_zoomLevel === 1) _scrollNoteOffset = 0;
+  _clampNoteScroll();
+  buildPitchAxis();
+  _updateZoomBtns();
+}
+
+function _updateZoomBtns() {
+  const btnIn  = document.getElementById('zoomInBtn');
+  const btnOut = document.getElementById('zoomOutBtn');
+  const label  = document.getElementById('zoomLabel');
+  if (btnIn)  btnIn.disabled  = _zoomLevel >= 8;
+  if (btnOut) btnOut.disabled = _zoomLevel <= 1;
+  if (label)  label.textContent = `${_zoomLevel * 100}%`;
+}
+
+// ---- Seek to start ----
+export function seekToStart() {
+  scrollMs = 0;
+  _seekMs = null;
+}
+
 function resizeCanvas() {
   if (!canvas) return;
   canvas.width = canvas.offsetWidth * devicePixelRatio;
@@ -88,58 +150,90 @@ function resizeCanvas() {
 function buildPitchAxis() {
   const el = document.getElementById('recordPitchAxis');
   if (!el || !_instrument) return;
+  const loVisible = _instrument.loMidi + _scrollNoteOffset;
+  const hiVisible = loVisible + _getVisibleNoteCount() - 1;
   const spans = [];
-  for (let m = _instrument.hiMidi; m >= _instrument.loMidi; m--) {
+  for (let m = hiVisible; m >= loVisible; m--) {
     const info = midiToNoteInfo(m);
     const isBlack = BLACK_KEYS.has(info.note);
-    // Label all white keys; show octave number only on C to mark octave boundaries
     const label = isBlack ? '' : noteName(info.note, info.octave, _noteStyle, info.note === 0);
     spans.push(`<span class="${isBlack ? 'axis-black' : 'axis-white'}">${label}</span>`);
   }
   el.innerHTML = spans.join('');
 }
 
-// ---- Drag scroll ----
+// ---- Drag scroll / tap-to-seek ----
 function _initDragScroll() {
   if (!canvas) return;
 
-  function canDrag() { return !recording && !playing && getTotalDuration() > 0; }
+  const TAP_MAX_MOVE = 12; // px
+  const TAP_MAX_MS   = 280;
 
-  function startDrag(clientX) {
-    if (!canDrag()) return;
+  function canInteract() { return !recording && getTotalDuration() > 0; }
+
+  function startPointer(clientX, clientY) {
+    _pointerDownX = clientX;
+    _pointerDownY = clientY;
+    _pointerDownTime = performance.now();
+    if (!canInteract()) return;
     _dragActive = true;
     _dragStartX = clientX;
+    _dragStartY = clientY;
     _dragStartScrollMs = scrollMs;
+    _dragStartNoteOffset = _scrollNoteOffset;
     canvas.style.cursor = 'grabbing';
   }
 
-  function moveDrag(clientX) {
+  function movePointer(clientX, clientY) {
     if (!_dragActive) return;
+    // 横スクロール
     const dx = clientX - _dragStartX;
     const msPerPx = viewMs / (canvas.offsetWidth || 1);
-    const maxScroll = Math.max(0, getTotalDuration() - viewMs * 0.1);
-    scrollMs = Math.max(0, Math.min(_dragStartScrollMs - dx * msPerPx, maxScroll));
+    const maxScrollMs = Math.max(0, getTotalDuration() - viewMs * 0.1);
+    scrollMs = Math.max(0, Math.min(_dragStartScrollMs - dx * msPerPx, maxScrollMs));
+    // 縦スクロール（ズーム時のみ）
+    if (_zoomLevel > 1 && _instrument) {
+      const dy = clientY - _dragStartY;
+      const visibleNotes = _getVisibleNoteCount();
+      const noteRange = _instrument.hiMidi - _instrument.loMidi + 1;
+      const notesPerPx = visibleNotes / (canvas.offsetHeight || 1);
+      const maxNoteScroll = Math.max(0, noteRange - visibleNotes);
+      // 上にドラッグ → 高音方向にスクロール
+      _scrollNoteOffset = Math.max(0, Math.min(_dragStartNoteOffset + dy * notesPerPx, maxNoteScroll));
+      buildPitchAxis();
+    }
     updateTimeBar(scrollMs + viewMs * 0.75, getTotalDuration());
   }
 
-  function endDrag() {
+  function endPointer(clientX, clientY) {
+    const moved = Math.abs(clientX - _pointerDownX) + Math.abs(clientY - _pointerDownY);
+    const dt    = performance.now() - _pointerDownTime;
     _dragActive = false;
-    canvas.style.cursor = canDrag() ? 'grab' : '';
+    canvas.style.cursor = canInteract() ? 'pointer' : '';
+
+    // タップ判定：移動量が小さく短時間ならシーク
+    if (moved < TAP_MAX_MOVE && dt < TAP_MAX_MS && canInteract()) {
+      const rect = canvas.getBoundingClientRect();
+      const tapX = (clientX - rect.left) * devicePixelRatio;
+      const msPerPx = viewMs / (canvas.width || 1);
+      _seekMs = scrollMs + tapX * msPerPx;
+    }
   }
 
   // マウス
-  canvas.addEventListener('mousedown',  (e) => startDrag(e.clientX));
-  canvas.addEventListener('mousemove',  (e) => moveDrag(e.clientX));
-  canvas.addEventListener('mouseup',    endDrag);
-  canvas.addEventListener('mouseleave', endDrag);
+  canvas.addEventListener('mousedown',  (e) => startPointer(e.clientX, e.clientY));
+  canvas.addEventListener('mousemove',  (e) => movePointer(e.clientX, e.clientY));
+  canvas.addEventListener('mouseup',    (e) => endPointer(e.clientX, e.clientY));
+  canvas.addEventListener('mouseleave', (e) => { _dragActive = false; canvas.style.cursor = canInteract() ? 'pointer' : ''; });
 
   // タッチ
-  canvas.addEventListener('touchstart', (e) => startDrag(e.touches[0].clientX), { passive: true });
-  canvas.addEventListener('touchmove',  (e) => { e.preventDefault(); moveDrag(e.touches[0].clientX); }, { passive: false });
-  canvas.addEventListener('touchend',   endDrag);
+  canvas.addEventListener('touchstart', (e) => startPointer(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+  canvas.addEventListener('touchmove',  (e) => { e.preventDefault(); movePointer(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  canvas.addEventListener('touchend',   (e) => endPointer(
+    e.changedTouches[0].clientX, e.changedTouches[0].clientY
+  ));
 
-  // カーソル（録音データがある時は grab を示す）
-  canvas.addEventListener('mouseenter', () => { if (canDrag()) canvas.style.cursor = 'grab'; });
+  canvas.addEventListener('mouseenter', () => { if (canInteract()) canvas.style.cursor = 'pointer'; });
 }
 
 // ---- Watchdog helpers ----
@@ -178,6 +272,7 @@ function startRecording() {
   recordEvents = [];
   recordStartTime = performance.now();
   scrollMs = 0;
+  _seekMs = null;
   _lastFreq = null;
   _freqSamples = [];
   _freqEma = null;
@@ -377,20 +472,21 @@ export function togglePlayback() {
 
 function startPlayback() {
   if (recordEvents.length === 0) return;
+  const fromMs = (_seekMs !== null) ? Math.max(0, _seekMs) : 0;
   playing = true;
-  scrollMs = 0;
+  scrollMs = Math.max(0, fromMs - viewMs * 0.75);
   document.getElementById('playBackBtn').classList.add('playing');
   document.querySelector('#playBackBtn span').textContent = t('btn_stop');
   document.getElementById('recBtn').disabled = true;
 
-  _currentSynthHandle = playSynthSequence(recordEvents, onPlaybackEnd);
+  _currentSynthHandle = playSynthSequence(recordEvents, onPlaybackEnd, fromMs);
 
   const totalMs = getTotalDuration();
   const startWall = performance.now();
 
   function tick() {
     if (!playing) return;
-    const elapsed = performance.now() - startWall;
+    const elapsed = performance.now() - startWall + fromMs;
     scrollMs = Math.max(0, elapsed - viewMs * 0.75);
     updateTimeBar(elapsed, totalMs);
     if (elapsed < totalMs + 500) _playbackTimer = setTimeout(tick, 33);
@@ -520,6 +616,26 @@ function startDrawLoop() {
   draw();
 }
 
+// シーク位置にある音符情報を返す
+function _findNoteAtMs(ms) {
+  for (const ev of recordEvents) {
+    if (ms >= ev.timeMs && ms <= ev.timeMs + ev.durationMs) {
+      const offset = ms - ev.timeMs;
+      const s = ev.freqSamples.length > 0
+        ? ev.freqSamples.reduce((best, cur) =>
+            Math.abs(cur.offsetMs - offset) < Math.abs(best.offsetMs - offset) ? cur : best
+          )
+        : null;
+      if (!s) return null;
+      const midiF = freqToMidi(s.freq, _concertPitch);
+      const centsF = Math.round((midiF - Math.round(midiF)) * 100);
+      const info = midiToNoteInfo(midiF);
+      return { name: noteName(info.note, info.octave, _noteStyle, false), octave: info.octave, cents: centsF };
+    }
+  }
+  return null;
+}
+
 function drawCanvas() {
   if (!ctx || !canvas || !_instrument) return;
   if (canvas.width === 0 || canvas.height === 0) {
@@ -534,19 +650,20 @@ function drawCanvas() {
   ctx.fillStyle = style.getPropertyValue('--bg-color').trim();
   ctx.fillRect(0, 0, w, h);
 
-  const loMidi = _instrument.loMidi;
-  const hiMidi = _instrument.hiMidi;
-  const noteRange = hiMidi - loMidi + 1;
-  const laneH = h / noteRange;
+  // 可視音域（ズーム対応）
+  const loVisible = _instrument.loMidi + _scrollNoteOffset;
+  const hiVisible = loVisible + _getVisibleNoteCount() - 1;
+  const visNoteRange = hiVisible - loVisible + 1;
+  const laneH = h / visNoteRange;
 
   const surfaceColor = style.getPropertyValue('--surface-color').trim();
   const dotBg        = style.getPropertyValue('--dot-bg').trim();
   const dotWeak      = style.getPropertyValue('--dot-weak').trim();
   const textColor    = style.getPropertyValue('--text-color').trim();
 
-  // Lane backgrounds
-  for (let m = loMidi; m <= hiMidi; m++) {
-    const laneY = h - (m - loMidi + 1) * laneH;
+  // Lane backgrounds（可視範囲のみ）
+  for (let m = loVisible; m <= hiVisible; m++) {
+    const laneY = h - (m - loVisible + 1) * laneH;
     const info = midiToNoteInfo(m);
     const isBlack = BLACK_KEYS.has(info.note);
     ctx.fillStyle = isBlack ? dotBg : surfaceColor;
@@ -564,7 +681,7 @@ function drawCanvas() {
   const sharpColor  = style.getPropertyValue('--sharp-color').trim()  || '#e53935';
   const flatColor   = style.getPropertyValue('--flat-color').trim()   || '#1e88e5';
 
-  // ピッチグラフとしてイベントを描画（実際の周波数サンプルを点＋線で表示）
+  // ピッチグラフ描画
   function drawEvent(ev, alpha) {
     const samples = ev.freqSamples;
     if (!samples || samples.length === 0) return;
@@ -574,8 +691,8 @@ function drawCanvas() {
       const x = (ev.timeMs + s.offsetMs - scrollMs) / msPerPx;
       if (x < -6 || x > w + 6) continue;
       const midiF = freqToMidi(s.freq, _concertPitch);
-      if (midiF < loMidi - 0.5 || midiF > hiMidi + 0.5) continue;
-      const y = h - (midiF - loMidi + 0.5) / noteRange * h;
+      if (midiF < loVisible - 0.5 || midiF > hiVisible + 0.5) continue;
+      const y = h - (midiF - loVisible + 0.5) / visNoteRange * h;
       const centsF = (midiF - Math.round(midiF)) * 100;
       const color = Math.abs(centsF) <= _inTuneCents ? inTuneColor : centsF > 0 ? sharpColor : flatColor;
       pts.push({ x, y, color });
@@ -588,7 +705,6 @@ function drawCanvas() {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // 線（隣接点ごとに色付け）
     for (let i = 0; i < pts.length - 1; i++) {
       ctx.strokeStyle = pts[i].color;
       ctx.beginPath();
@@ -596,7 +712,6 @@ function drawCanvas() {
       ctx.lineTo(pts[i + 1].x, pts[i + 1].y);
       ctx.stroke();
     }
-    // ドット
     for (const p of pts) {
       ctx.fillStyle = p.color;
       ctx.beginPath();
@@ -606,10 +721,8 @@ function drawCanvas() {
     ctx.restore();
   }
 
-  // Completed events
   for (const ev of recordEvents) drawEvent(ev, 0.85);
 
-  // Active (in-progress) note during recording
   if (recording && _lastFreq !== null && _freqSamples.length > 0) {
     drawEvent({ timeMs: _lastEventStart, freqSamples: _freqSamples }, 0.95);
   }
@@ -623,5 +736,42 @@ function drawCanvas() {
     ctx.moveTo(posX, 0);
     ctx.lineTo(posX, h);
     ctx.stroke();
+  }
+
+  // Seek line（タップ位置）
+  if (_seekMs !== null && !recording && !playing) {
+    const seekX = (_seekMs - scrollMs) / msPerPx;
+    if (seekX >= 0 && seekX <= w) {
+      ctx.save();
+      ctx.strokeStyle = textColor;
+      ctx.lineWidth = 1.5 * dpr;
+      ctx.globalAlpha = 0.7;
+      ctx.setLineDash([4 * dpr, 3 * dpr]);
+      ctx.beginPath();
+      ctx.moveTo(seekX, 0);
+      ctx.lineTo(seekX, h);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+
+      // ラベル（音名＋cents）
+      const noteInfo = _findNoteAtMs(_seekMs);
+      if (noteInfo) {
+        const sign = noteInfo.cents >= 0 ? '+' : '';
+        const label = `${noteInfo.name}${noteInfo.octave}  ${sign}${noteInfo.cents}¢`;
+        const fs = 11 * dpr;
+        ctx.font = `bold ${fs}px sans-serif`;
+        const tw = ctx.measureText(label).width;
+        const lx = Math.min(seekX + 5 * dpr, w - tw - 4 * dpr);
+        const ly = 14 * dpr;
+        ctx.fillStyle = style.getPropertyValue('--surface-color').trim() || '#fff';
+        ctx.globalAlpha = 0.85;
+        ctx.fillRect(lx - 3 * dpr, ly - fs, tw + 6 * dpr, fs + 4 * dpr);
+        ctx.globalAlpha = 1;
+        ctx.fillStyle = textColor;
+        ctx.fillText(label, lx, ly);
+      }
+      ctx.restore();
+    }
   }
 }

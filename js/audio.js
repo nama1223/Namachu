@@ -164,7 +164,7 @@ let playbackCtx = null;
 /**
  * Play recorded events using actual pitch data (freqSamples) for vibrato reproduction.
  */
-export function playSynthSequence(events, onEnd) {
+export function playSynthSequence(events, onEnd, startOffsetMs = 0) {
   if (playbackCtx) { playbackCtx.close(); playbackCtx = null; }
   playbackCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -177,8 +177,14 @@ export function playSynthSequence(events, onEnd) {
 
   for (const ev of events) {
     if (!ev.freq) continue;
-    const t0 = startTime + ev.timeMs / 1000;
-    const dur = ev.durationMs / 1000;
+    // Skip events that end before the start offset
+    if (ev.timeMs + ev.durationMs <= startOffsetMs) continue;
+    // Adjust timing relative to startOffsetMs
+    const adjustedStart = Math.max(0, ev.timeMs - startOffsetMs);
+    const t0 = startTime + adjustedStart / 1000;
+    // Trim duration if event started before offset
+    const trimMs = Math.max(0, startOffsetMs - ev.timeMs);
+    const dur = (ev.durationMs - trimMs) / 1000;
     if (dur <= 0) continue;
 
     // Per-note gain for fade in/out (avoids clicks)
@@ -198,12 +204,18 @@ export function playSynthSequence(events, onEnd) {
     // Schedule actual pitch variation (vibrato, slides, etc.)
     const samples = ev.freqSamples;
     if (samples && samples.length > 1) {
-      osc.frequency.setValueAtTime(samples[0].freq, t0);
-      for (let i = 1; i < samples.length; i++) {
-        osc.frequency.linearRampToValueAtTime(
-          samples[i].freq,
-          t0 + samples[i].offsetMs / 1000
-        );
+      // Filter to samples after trim point, adjust offsets
+      const validSamples = samples.filter(s => s.offsetMs >= trimMs);
+      if (validSamples.length > 0) {
+        osc.frequency.setValueAtTime(validSamples[0].freq, t0);
+        for (let i = 1; i < validSamples.length; i++) {
+          osc.frequency.linearRampToValueAtTime(
+            validSamples[i].freq,
+            t0 + (validSamples[i].offsetMs - trimMs) / 1000
+          );
+        }
+      } else {
+        osc.frequency.value = ev.freq;
       }
     } else {
       osc.frequency.value = ev.freq;

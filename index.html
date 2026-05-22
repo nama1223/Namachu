@@ -126,6 +126,12 @@
       </div>
     </div>
 
+    <div class="record-zoom-bar">
+      <button class="zoom-btn" id="zoomOutBtn" onclick="zoomRecordOut()">−</button>
+      <span id="zoomLabel">100%</span>
+      <button class="zoom-btn" id="zoomInBtn" onclick="zoomRecordIn()">＋</button>
+    </div>
+
     <div class="record-view-wrapper">
       <canvas class="record-canvas" id="recordCanvas"></canvas>
       <div class="record-pitch-axis" id="recordPitchAxis"></div>
@@ -141,6 +147,7 @@
 
     <div class="record-controls">
       <button class="rec-btn" id="recBtn" onclick="toggleRecording()">⏺ <span data-i18n="btn_record">録音</span></button>
+      <button class="tostart-btn" id="toStartBtn" onclick="seekToStart()" title="最初に戻る">⏮</button>
       <button class="play-btn" id="playBackBtn" onclick="togglePlayback()" disabled>▶ <span data-i18n="btn_play">再生</span></button>
       <button class="clear-btn" id="clearRecBtn" onclick="clearRecording()">✕</button>
     </div>
@@ -363,6 +370,30 @@
       </div>
     </div>
 
+    <!-- 外部機器の設定 -->
+    <div class="setting-card" id="card-extinput">
+      <div class="setting-card-header" onclick="toggleCard('card-extinput')">
+        <span class="setting-card-title" data-i18n="label_ext_input">外部機器の設定</span>
+        <span class="card-arrow">▼</span>
+      </div>
+      <div class="setting-card-body">
+        <div class="ext-input-row">
+          <div class="ext-input-info">
+            <div class="ext-input-label" data-i18n="ext_input_action1">メイン操作</div>
+            <div class="ext-input-binding" id="extInputBinding1">未設定</div>
+          </div>
+          <button class="setting-action-btn" onclick="openExtInputModal('action1')">設定</button>
+        </div>
+        <div class="ext-input-row" style="margin-top:10px;">
+          <div class="ext-input-info">
+            <div class="ext-input-label" data-i18n="ext_input_action2">再生 / 停止</div>
+            <div class="ext-input-binding" id="extInputBinding2">未設定</div>
+          </div>
+          <button class="setting-action-btn" onclick="openExtInputModal('action2')">設定</button>
+        </div>
+      </div>
+    </div>
+
     <!-- データ管理 -->
     <div class="setting-card" id="card-data">
       <div class="setting-card-header" onclick="toggleCard('card-data')">
@@ -407,6 +438,21 @@
     </div>
     <div class="modal-buttons">
       <button onclick="closeModal('recordInstrumentModal')" data-i18n="btn_close">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 外部機器入力設定モーダル ===== -->
+<div class="modal-overlay" id="extInputModal" onclick="if(event.target===this)closeExtInputModal()">
+  <div class="modal-content">
+    <h2 data-i18n="label_ext_input">外部機器の設定</h2>
+    <p id="extInputActionLabel" style="font-weight:bold;margin-bottom:8px;"></p>
+    <div class="ext-input-modal-status" id="extInputStatus"></div>
+    <div class="ext-input-modal-info" id="extInputDetectedInfo" style="display:none;"></div>
+    <div class="modal-buttons" style="margin-top:16px;">
+      <button onclick="closeExtInputModal()" data-i18n="btn_cancel">キャンセル</button>
+      <button onclick="retryExtInput()" data-i18n="btn_retry_binding">再設定</button>
+      <button id="extInputSaveBtn" onclick="saveExtInput()" disabled data-i18n="btn_save">保存</button>
     </div>
   </div>
 </div>

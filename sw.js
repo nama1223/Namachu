@@ -1,5 +1,5 @@
 // バージョンを上げると古いキャッシュが破棄される
-const VERSION = 'v24';
+const VERSION = 'v25';
 const CACHE_NAME = `namachu-cache-${VERSION}`;
 
 const urlsToCache = [
@@ -26,6 +26,7 @@ const urlsToCache = [
   './js/settings.js',
   './js/tuner.js',
   './js/utils.js',
+  './js/extInput.js',
 ];
 
 self.addEventListener('install', (event) => {

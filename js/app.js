@@ -8,6 +8,8 @@ import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecord
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, importScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, setScaleInTuneCents, confirmScaleDataset, switchScaleView } from './scale.js';
 import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, adjustInTuneCents, getInTuneCents, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
 import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
+import { initExtInput, openExtInputModal, closeExtInputModal, retryExtInput, saveExtInput } from './extInput.js';
+import { zoomRecordIn, zoomRecordOut, seekToStart } from './record.js';
 
 // ---- Tab management ----
 let _currentTab = 'tuner';
@@ -154,6 +156,18 @@ function init() {
     }
   });
 
+  // External device input
+  initExtInput(
+    // action1: タブに応じてマイク・録音・スケール操作
+    () => {
+      if (_currentTab === 'tuner') toggleMic();
+      else if (_currentTab === 'record') toggleRecording();
+      else if (_currentTab === 'scale') window.toggleScaleMeasure?.();
+    },
+    // action2: 再生/停止（音階記録タブ）
+    () => togglePlayback()
+  );
+
   // Calibration
   initCalibration(applyCalibratedSensitivity);
 
@@ -200,6 +214,9 @@ function exposeGlobals() {
   g.onRecordInstrumentChange = onRecordInstrumentChange;
   g.toggleRecording = toggleRecording;
   g.togglePlayback = togglePlayback;
+  g.zoomRecordIn = zoomRecordIn;
+  g.zoomRecordOut = zoomRecordOut;
+  g.seekToStart = seekToStart;
   g.clearRecording = clearRecording;
   g.saveRecording = saveRecording;
   g.confirmSaveRecording = confirmSaveRecording;
@@ -219,6 +236,12 @@ function exposeGlobals() {
   g.onScaleInstrumentChange = _settingsScaleInstChange;
   g.switchScaleView = switchScaleView;
   g.showScaleHelp = () => openModal('scaleHelpModal');
+
+  // External device input
+  g.openExtInputModal = openExtInputModal;
+  g.closeExtInputModal = closeExtInputModal;
+  g.retryExtInput = retryExtInput;
+  g.saveExtInput = saveExtInput;
 
   // Calibration
   g.openCalibration = openCalibration;

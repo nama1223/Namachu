@@ -73,6 +73,45 @@
   min-width: 0; /* flex子要素が縮めるように */
 }
 
+/* ---- 外部機器の設定 ---- */
+.ext-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.ext-input-info {
+  flex: 1;
+  min-width: 0;
+}
+.ext-input-label {
+  font-size: 0.82rem;
+  opacity: 0.7;
+  margin-bottom: 2px;
+}
+.ext-input-binding {
+  font-weight: bold;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 外部機器モーダル */
+.ext-input-modal-status {
+  text-align: center;
+  font-size: 0.95rem;
+  padding: 12px 0 4px;
+  opacity: 0.8;
+}
+.ext-input-modal-info {
+  background: var(--dot-bg);
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-top: 8px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
 /* Theme button color swatches */
 .theme-btn[data-theme="default"] { background: #dccaaf; color: #4a3f35; }
 .theme-btn[data-theme="dark"]    { background: #2c2c2c; color: #e0e0e0; }

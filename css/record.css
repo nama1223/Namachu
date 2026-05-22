@@ -23,6 +23,34 @@
   margin: 0 8px;
 }
 
+/* ---- ズームバー ---- */
+.record-zoom-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+  color: var(--text-color);
+  opacity: 0.8;
+}
+.zoom-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--dot-bg);
+  border: 1px solid var(--dot-weak);
+  color: var(--text-color);
+  font-size: 1rem;
+  font-weight: bold;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.zoom-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
 /* ---- カラオケ式キャンバス ---- */
 .record-view-wrapper {
   position: relative;
@@ -150,6 +178,20 @@
 .play-btn.playing {
   background: var(--primary-color);
   color: #fff;
+}
+
+.tostart-btn {
+  width: 44px;
+  background: var(--dot-bg);
+  color: var(--text-color);
+  border: 1px solid var(--dot-weak);
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .clear-btn {
