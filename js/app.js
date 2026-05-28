@@ -6,7 +6,7 @@ import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold, resume
 import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, setTunerInTuneCents, toggleFullColor, toggleRefPitch, stepRefPitch, stopRefPitchTone } from './tuner.js';
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook, setRecordInTuneCents, stopPlaybackIfPlaying } from './record.js';
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, importScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, setScaleInTuneCents, confirmScaleDataset, switchScaleView } from './scale.js';
-import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, adjustInTuneCents, getInTuneCents, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
+import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, adjustInTuneCents, getInTuneCents, getRangeLevel, buildAllRangePickers, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
 import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
 import { initExtInput, openExtInputModal, closeExtInputModal, retryExtInput, saveExtInput } from './extInput.js';
 import { zoomRecordIn, zoomRecordOut, seekToStart } from './record.js';
@@ -63,7 +63,7 @@ function onAudioFrame(freq, clarity, rms) {
 
 // ---- Settings change callback ----
 function onSettingsChange(s) {
-  const inst = getInstrument(s.instrumentId);
+  const inst = getInstrument(s.instrumentId, s.rangeLevel ?? 1);
   const cp = s.concertPitch;
   const ns = s.noteStyle;
   _clarityThreshold = clarityToThreshold(s.clarity);
@@ -103,7 +103,7 @@ function init() {
   // Settings (must come before other inits so instrument etc. are ready)
   initSettings(onSettingsChange);
   const s = getSettings();
-  const inst = getInstrument(s.instrumentId);
+  const inst = getInstrument(s.instrumentId, s.rangeLevel ?? 1);
 
   // Sub-module init
   initTuner({
@@ -173,6 +173,9 @@ function init() {
 
   // Wake Lock
   initWakeLock();
+
+  // Range pickers（全タブ）
+  buildAllRangePickers();
 
   // Apply i18n again after all elements rendered
   applyI18n();

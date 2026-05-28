@@ -16,6 +16,7 @@ const DEFAULTS = {
   clarity: 85,
   silenceGrace: 100, // ms; 持続音中のドロップアウトをこの時間まで許容
   inTuneCents: 5,   // ±N¢ 以内を「合っている」と判定
+  rangeLevel: 1,    // 0=初級 1=中級 2=上級 3=プロ
   collapsedCards: [],
 };
 
@@ -181,7 +182,7 @@ export function onRecordInstrumentChange() {
 }
 
 function updateInstrumentInfo() {
-  const inst = getInstrument(_settings.instrumentId);
+  const inst = getInstrument(_settings.instrumentId, _settings.rangeLevel ?? 1);
   const lang = getLang();
 
   const transEl = document.getElementById('transpositionLabel');
@@ -212,6 +213,60 @@ export function adjustConcertPitch(delta) {
   document.getElementById('concertPitchVal').textContent = _settings.concertPitch;
   document.getElementById('concertPitchBadge').textContent = `A = ${_settings.concertPitch} Hz`;
   saveAndNotify();
+}
+
+// ---- Range level ----
+export function getRangeLevel() { return _settings.rangeLevel ?? 1; }
+
+export function setRangeLevel(n) {
+  _settings.rangeLevel = Math.max(0, Math.min(3, n));
+  updateInstrumentInfo();
+  _refreshRangePickers();
+  saveAndNotify();
+}
+
+// 短縮ラベル（タブ内）とフルラベル（設定内）
+const _RANGE_SHORT = { ja: ['初','中','上','Ｐ'], en: ['Beg','Int','Adv','Pro'] };
+const _RANGE_FULL  = { ja: ['初級','中級','上級','プロ'], en: ['Beginner','Intermediate','Advanced','Pro'] };
+
+export function buildAllRangePickers() {
+  _refreshRangePickers();
+  // スワイプ・ホイールリスナーを全ピッカーに設置（1回のみ）
+  for (const id of ['rangePicker-tuner','rangePicker-record','rangePicker-scale','rangePicker-settings']) {
+    const el = document.getElementById(id);
+    if (el && !el.dataset.gesturesAttached) {
+      el.dataset.gesturesAttached = '1';
+      el.addEventListener('wheel', e => { e.preventDefault(); setRangeLevel(getRangeLevel() + (e.deltaY > 0 ? 1 : -1)); }, { passive: false });
+      let _tx = 0;
+      el.addEventListener('touchstart', e => { _tx = e.touches[0].clientX; }, { passive: true });
+      el.addEventListener('touchend',   e => {
+        const dx = e.changedTouches[0].clientX - _tx;
+        if (Math.abs(dx) > 30) setRangeLevel(getRangeLevel() + (dx < 0 ? 1 : -1));
+      }, { passive: true });
+    }
+  }
+  // クリック委譲（document全体で1度だけ登録）
+  if (!document._rangePickerListenerAttached) {
+    document._rangePickerListenerAttached = true;
+    document.addEventListener('click', e => {
+      const btn = e.target.closest('.range-lvl-btn');
+      if (btn && btn.dataset.lvl !== undefined) setRangeLevel(+btn.dataset.lvl);
+    });
+  }
+}
+
+function _refreshRangePickers() {
+  const lang = getLang();
+  const level = getRangeLevel();
+  for (const id of ['rangePicker-tuner','rangePicker-record','rangePicker-scale','rangePicker-settings']) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    const compact = id !== 'rangePicker-settings';
+    const labels = compact ? _RANGE_SHORT[lang] : _RANGE_FULL[lang];
+    el.innerHTML = labels.map((l, i) =>
+      `<button class="range-lvl-btn${i === level ? ' active' : ''}" data-lvl="${i}">${l}</button>`
+    ).join('');
+  }
 }
 
 // ---- In-tune tolerance ----
@@ -412,6 +467,7 @@ function restoreUI() {
 
   buildThemeGrid();
   applyTheme(_settings.theme);
+  _refreshRangePickers();
 
   const minVol = document.getElementById('minVolumeSlider');
   if (minVol) { minVol.value = _settings.minVolume; document.getElementById('minVolumeVal').textContent = _settings.minVolume; }
@@ -459,6 +515,7 @@ export function refreshSettingsUI() {
   buildThemeGrid();
   updateInstrumentInfo();
   updateCardSummaries();
+  _refreshRangePickers();
   refreshMicDevices(); // async, fire-and-forget
 }
 

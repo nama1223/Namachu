@@ -109,6 +109,7 @@
 
     <div class="tuner-footer">
       <span class="instrument-badge" id="instrumentBadge" onclick="switchTab('settings')"></span>
+      <div id="rangePicker-tuner" class="range-picker-compact" title="スクロール/スワイプで音域レベル変更"></div>
       <div class="tuner-footer-right">
         <span class="concert-pitch-badge" id="concertPitchBadge">A = 442 Hz</span>
       </div>
@@ -130,6 +131,7 @@
       <button class="zoom-btn" id="zoomOutBtn" onclick="zoomRecordOut()">−</button>
       <span id="zoomLabel">100%</span>
       <button class="zoom-btn" id="zoomInBtn" onclick="zoomRecordIn()">＋</button>
+      <div id="rangePicker-record" class="range-picker-compact" title="スクロール/スワイプで音域レベル変更"></div>
     </div>
 
     <div class="record-view-wrapper">
@@ -174,6 +176,7 @@
         <select id="scaleFamilySelect" onchange="onScaleFamilyChange()"></select>
         <select id="scaleMeasureInstrument" onchange="onScaleInstrumentChange()"></select>
       </div>
+      <div id="rangePicker-scale" class="range-picker-compact" title="スクロール/スワイプで音域レベル変更"></div>
     </div>
 
     <!-- チューニング確認 (計測前のみ表示) -->
@@ -264,6 +267,10 @@
         <div class="setting-row">
           <label data-i18n="label_range">音域</label>
           <span id="rangeLabel" class="setting-value-badge"></span>
+        </div>
+        <div class="setting-row" style="margin-top:6px;align-items:center;">
+          <label data-i18n="label_range_level">音域レベル</label>
+          <div id="rangePicker-settings" class="range-picker" title="スクロール/スワイプで切り替え"></div>
         </div>
       </div>
     </div>

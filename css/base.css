@@ -365,3 +365,44 @@ button {
 
 /* ---- Ad spacer ---- */
 .ad-spacer { height: 80px; pointer-events: none; }
+
+/* ---- Range level picker ---- */
+.range-picker-compact {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.range-picker {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+}
+
+.range-lvl-btn {
+  padding: 2px 7px;
+  border: 1px solid var(--dot-weak, #ccc);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-color);
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  white-space: nowrap;
+  line-height: 1.5;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.range-lvl-btn.active {
+  background: var(--in-tune-color);
+  border-color: var(--in-tune-color);
+  color: #fff;
+}
+
+/* 設定タブ内はやや大きく */
+.range-picker .range-lvl-btn {
+  padding: 4px 10px;
+  font-size: 0.85rem;
+}
