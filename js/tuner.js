@@ -115,7 +115,8 @@ export function onPitch(freq, clarity, rms) {
   animateNeedleTo(cents);
   updateDisplay(name, dispInfo.octave, cents, freq, inTune);
   updateFullColorBg(cents);
-  _sbUpdate(freq);
+  // 最近傍 MIDI ノートの周波数（±0¢）を返す
+  _sbUpdate(midiToFreq(Math.round(midi), _concertPitch));
 }
 
 // ---- Meter needle ----
