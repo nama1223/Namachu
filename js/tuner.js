@@ -15,6 +15,15 @@ let _inTuneCents = 5;
 const REF_PITCH_LO = 48; // C3
 const REF_PITCH_HI = 84; // C6
 let _refMidi = 69;        // A4 default
+
+// ---- Sound back state ----
+const SB_GRACE_MS = 300;  // 途切れ無視時間 (ms)
+let _sbEnabled   = false;
+let _sbCtx       = null;
+let _sbOsc       = null;
+let _sbGain      = null;
+let _sbPlaying   = false;
+let _sbGraceTimer = null;
 let _refCtx  = null;
 let _refOsc  = null;
 let _refGain = null;
@@ -84,6 +93,7 @@ function _clearFullColorBg() {
 // ---- Called each audio frame ----
 export function onPitch(freq, clarity, rms) {
   if (!freq || clarity < _clarityThreshold) {
+    _sbUpdate(null);
     // 無音時はグラフを進めず一時停止（針と表示だけ更新）
     animateNeedleTo(0);
     setDisplaySilent();
@@ -105,6 +115,7 @@ export function onPitch(freq, clarity, rms) {
   animateNeedleTo(cents);
   updateDisplay(name, dispInfo.octave, cents, freq, inTune);
   updateFullColorBg(cents);
+  _sbUpdate(freq);
 }
 
 // ---- Meter needle ----
@@ -401,6 +412,83 @@ export function toggleRefPitch() {
 
 export function stopRefPitchTone() {
   if (_refPlaying) _stopRefPitch();
+}
+
+// ---- Sound back ----
+export function toggleSoundBack() {
+  _sbEnabled = !_sbEnabled;
+  document.getElementById('soundBackBtn')?.classList.toggle('active', _sbEnabled);
+  if (!_sbEnabled) _sbStop(false);
+}
+
+export function stopSoundBack() {
+  _sbEnabled = false;
+  document.getElementById('soundBackBtn')?.classList.remove('active');
+  _sbStop(false);
+}
+
+function _sbUpdate(freq) {
+  if (!_sbEnabled) return;
+
+  if (!freq) {
+    // 無音 → 猶予タイマーを開始（まだ止めない）
+    if (_sbPlaying && !_sbGraceTimer) {
+      _sbGraceTimer = setTimeout(() => {
+        _sbGraceTimer = null;
+        _sbStop(true);
+      }, SB_GRACE_MS);
+    }
+    return;
+  }
+
+  // 音あり → 猶予タイマーをキャンセル
+  clearTimeout(_sbGraceTimer);
+  _sbGraceTimer = null;
+
+  if (!_sbCtx) _sbCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (_sbCtx.state === 'suspended') _sbCtx.resume();
+
+  if (!_sbOsc) {
+    // クラリネット近似波形（基準音と同じ）
+    const n = 10;
+    const real = new Float32Array(n);
+    const imag = new Float32Array(n);
+    imag[1] = 1.00; imag[2] = 0.02; imag[3] = 0.50;
+    imag[4] = 0.01; imag[5] = 0.22; imag[6] = 0.01;
+    imag[7] = 0.08; imag[8] = 0.01; imag[9] = 0.04;
+    const wave = _sbCtx.createPeriodicWave(real, imag);
+
+    _sbGain = _sbCtx.createGain();
+    _sbGain.gain.setValueAtTime(0, _sbCtx.currentTime);
+    _sbGain.gain.linearRampToValueAtTime(0.9, _sbCtx.currentTime + 0.03);
+    _sbGain.connect(_sbCtx.destination);
+
+    _sbOsc = _sbCtx.createOscillator();
+    _sbOsc.setPeriodicWave(wave);
+    _sbOsc.frequency.value = freq;
+    _sbOsc.connect(_sbGain);
+    _sbOsc.start();
+    _sbPlaying = true;
+  } else {
+    // 周波数を滑らかに追従
+    _sbOsc.frequency.setTargetAtTime(freq, _sbCtx.currentTime, 0.008);
+  }
+}
+
+function _sbStop(fade = true) {
+  clearTimeout(_sbGraceTimer);
+  _sbGraceTimer = null;
+  if (_sbGain && _sbCtx) {
+    if (fade) {
+      _sbGain.gain.setTargetAtTime(0, _sbCtx.currentTime, 0.04);
+      const ctx = _sbCtx;
+      setTimeout(() => { try { ctx.close(); } catch(e) {} }, 300);
+    } else {
+      try { _sbCtx.close(); } catch(e) {}
+    }
+  }
+  _sbCtx = null; _sbOsc = null; _sbGain = null;
+  _sbPlaying = false;
 }
 
 export function stepRefPitch(delta) {

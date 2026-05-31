@@ -3,7 +3,7 @@
 import { initI18n, setLang, applyI18n, t } from './i18n.js';
 import { showToast, closeModal, openModal, getInstrument, lsSet } from './utils.js';
 import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold, resumeAudioIfSuspended } from './audio.js';
-import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, setTunerInTuneCents, toggleFullColor, toggleRefPitch, stepRefPitch, stopRefPitchTone } from './tuner.js';
+import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, setTunerInTuneCents, toggleFullColor, toggleRefPitch, stepRefPitch, stopRefPitchTone, toggleSoundBack, stopSoundBack } from './tuner.js';
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook, setRecordInTuneCents, stopPlaybackIfPlaying } from './record.js';
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, importScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, setScaleInTuneCents, confirmScaleDataset, switchScaleView } from './scale.js';
 import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, adjustInTuneCents, getInTuneCents, getRangeLevel, buildAllRangePickers, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
@@ -191,6 +191,7 @@ function exposeGlobals() {
   g.toggleFullColor = toggleFullColor;
   g.toggleRefPitch = toggleRefPitch;
   g.stepRefPitch = stepRefPitch;
+  g.toggleSoundBack = toggleSoundBack;
   g.setLang = (lang) => { setLang(lang); applyI18n(); refreshSettingsUI(); };
 
   // Settings tab
@@ -264,6 +265,7 @@ function exposeGlobals() {
 // ---- 全音停止（NamaSound+ からの pauseAll メッセージ用） ----
 function pauseAllSound() {
   stopRefPitchTone();      // 基準音
+  stopSoundBack();         // 返音
   stopPlaybackIfPlaying(); // 記録タブの再生
 }
 
