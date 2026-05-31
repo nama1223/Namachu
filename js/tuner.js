@@ -430,7 +430,7 @@ function _startRefPitch() {
   _refGain = _refCtx.createGain();
   const now = _refCtx.currentTime;
   _refGain.gain.setValueAtTime(0, now);
-  _refGain.gain.linearRampToValueAtTime(0.28, now + 0.06);
+  _refGain.gain.linearRampToValueAtTime(0.9, now + 0.06);
   _refGain.connect(_refCtx.destination);
 
   _refOsc = _refCtx.createOscillator();

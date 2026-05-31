@@ -169,7 +169,7 @@ export function playSynthSequence(events, onEnd, startOffsetMs = 0) {
   playbackCtx = new (window.AudioContext || window.webkitAudioContext)();
 
   const masterGain = playbackCtx.createGain();
-  masterGain.gain.value = 0.35;
+  masterGain.gain.value = 1.0;
   masterGain.connect(playbackCtx.destination);
 
   const startTime = playbackCtx.currentTime;
