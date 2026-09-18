@@ -270,7 +270,7 @@ function pauseAllSound() {
 }
 
 // ---- NamaSound+ 親フレーム連携 ----
-const PARENT_ORIGIN = 'https://nama1223.github.io';
+const PARENT_ORIGIN = 'https://nama1223.com';
 
 window.addEventListener('message', (event) => {
   if (event.origin !== PARENT_ORIGIN) return;
