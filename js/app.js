@@ -270,10 +270,16 @@ function pauseAllSound() {
 }
 
 // ---- NamaSound+ 親フレーム連携 ----
-const PARENT_ORIGIN = 'https://nama1223.com';
+// ダブルドメイン対応: nama1223.com / nama1223.github.io のどちらから
+// 開かれていても親からのメッセージを受け取れるよう許可リスト化する。
+const ALLOWED_PARENT_ORIGINS = [
+  'https://nama1223.com',
+  'https://nama1223.github.io',
+  'http://nama1223.github.io',
+];
 
 window.addEventListener('message', (event) => {
-  if (event.origin !== PARENT_ORIGIN) return;
+  if (!ALLOWED_PARENT_ORIGINS.includes(event.origin)) return;
   const msg = event.data;
   if (!msg || typeof msg !== 'object') return;
 

@@ -93,7 +93,7 @@ export const INSTRUMENTS = [
   { id: 'tenor_horn',   family: 'brass_mid',   nameJa: 'テナーホーン (Eb)',          nameEn: 'Tenor Horn (Eb)',     trans: 3,   ranges: [[43,60],[43,67],[43,74],[43,77]] },
   { id: 'bb_trombone',  family: 'brass_mid',   nameJa: 'テナートロンボーン',         nameEn: 'Trombone (Bb)',       trans: 0,   ranges: [[40,58],[40,65],[40,72],[40,77]] },
   { id: 'bass_trombone',family: 'brass_mid',   nameJa: 'バストロンボーン',           nameEn: 'Bass Trombone',       trans: 0,   ranges: [[34,54],[34,62],[34,67],[34,72]] },
-  { id: 'bb_euph',      family: 'brass_mid',   nameJa: 'ユーフォニアム (Bb)',        nameEn: 'Euphonium (Bb)',      trans: -2,  ranges: [[36,55],[36,62],[36,67],[36,72]] },
+  { id: 'bb_euph',      family: 'brass_mid',   nameJa: 'ユーフォニアム (Bb)',        nameEn: 'Euphonium (Bb)',      trans: -2,  ranges: [[43,67],[38,70],[34,72],[29,77]] },
 
   // Low Brass
   { id: 'bb_tuba',      family: 'brass_low',   nameJa: 'テューバ (Bb)',              nameEn: 'Tuba (Bb)',           trans: -2,  ranges: [[29,48],[29,55],[29,60],[29,65]] },
