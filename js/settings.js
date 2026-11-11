@@ -310,27 +310,41 @@ export function getDisplayTrans() {
 }
 
 // ---- Mic selection ----
+// 設定タブとチューナー画面の2つのセレクトを常に同期させる
+function _micSelects() {
+  return ['micDeviceSelect', 'micDeviceSelectTuner']
+    .map(id => document.getElementById(id)).filter(Boolean);
+}
+
 export async function refreshMicDevices() {
-  const sel = document.getElementById('micDeviceSelect');
-  if (!sel) return;
+  const selects = _micSelects();
+  if (!selects.length) return;
   try {
     const devices = await getMicDevices();
     const current = _settings.micDeviceId;
-    sel.innerHTML = [
+    const html = [
       `<option value="">${t('label_mic_default')}</option>`,
       ...devices.map(d => `<option value="${d.deviceId}">${d.label}</option>`)
     ].join('');
-    sel.value = current || '';
+    selects.forEach(sel => { sel.innerHTML = html; sel.value = current || ''; });
   } catch {
-    sel.innerHTML = `<option value="">${t('label_mic_error')}</option>`;
+    selects.forEach(sel => { sel.innerHTML = `<option value="">${t('label_mic_error')}</option>`; });
   }
 }
 
-export function onMicDeviceChange() {
-  const sel = document.getElementById('micDeviceSelect');
-  _settings.micDeviceId = sel?.value || null;
+function _applyMicDevice(value) {
+  _settings.micDeviceId = value || null;
   setMicDeviceId(_settings.micDeviceId);
   saveAndNotify();
+  _micSelects().forEach(sel => { sel.value = value || ''; });
+}
+
+export function onMicDeviceChange() {
+  _applyMicDevice(document.getElementById('micDeviceSelect')?.value);
+}
+
+export function onMicDeviceChangeTuner() {
+  _applyMicDevice(document.getElementById('micDeviceSelectTuner')?.value);
 }
 
 // ---- Theme ----

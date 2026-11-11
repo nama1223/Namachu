@@ -202,6 +202,40 @@
   gap: 10px;
 }
 
+/* ---- 録音デバイス選択（コントロールバーの罫線の上） ---- */
+.mic-device-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0 2px;
+}
+.mic-device-label {
+  font-size: 0.8rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+.mic-device-select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 0.85rem;
+  border: 1px solid var(--dot-weak);
+  border-radius: 8px;
+  background: var(--surface-color);
+  color: var(--text-color);
+}
+.mic-device-refresh {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  border: 1px solid var(--dot-weak);
+  border-radius: 8px;
+  background: var(--surface-color);
+  color: var(--text-color);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
 /* ---- 基準音コントロールバー ---- */
 .tuner-control-bar {
   display: flex;

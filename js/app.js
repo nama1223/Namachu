@@ -6,10 +6,11 @@ import { startMic, stopMic, isMicRunning, setMinRms, setClarityThreshold, resume
 import { initTuner, onPitch as tunerOnPitch, setTunerConcertPitch, setTunerNoteStyle, setTunerInstrument, setTunerClarityThreshold, setTunerDisplayTrans, setTunerInTuneCents, toggleFullColor, toggleRefPitch, stepRefPitch, stopRefPitchTone, toggleSoundBack, stopSoundBack } from './tuner.js';
 import { initRecord, onRecordPitch, toggleRecording, togglePlayback, clearRecording, saveRecording, confirmSaveRecording, showRecordList, hideRecordList, loadRecording, deleteRecording, setRecordInstrument, setRecordConcertPitch, setRecordNoteStyle, setRecordSilenceGrace, setRecordRepairCallback, setRecordPreStartHook, setRecordInTuneCents, stopPlaybackIfPlaying } from './record.js';
 import { initScale, toggleScaleMeasure, clearScaleData, exportScaleData, importScaleData, deleteDataset, onScalePitch, setScaleInstrument, setScaleConcertPitch, setScaleNoteStyle, setScaleClarityThreshold, setScaleInTuneCents, confirmScaleDataset, switchScaleView } from './scale.js';
-import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, adjustInTuneCents, getInTuneCents, getRangeLevel, buildAllRangePickers, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
+import { initSettings, getSettings, onFamilyChange, onInstrumentChange, onScaleFamilyChange, onScaleInstrumentChange as _settingsScaleInstChange, onRecordFamilyChange, onRecordInstrumentChange, adjustConcertPitch, adjustInTuneCents, getInTuneCents, getRangeLevel, buildAllRangePickers, onNoteStyleChange, onDisplayTransChange, onMicDeviceChange, onMicDeviceChangeTuner, onMinVolumeChange, onClarityChange, exportAllData, importData, clearAllData, applyThemeUI, minVolumeToRms, clarityToThreshold, getDisplayTrans, refreshMicDevices, toggleCard, applyCalibratedSensitivity, getSilenceGrace, refreshSettingsUI, initWakeLock, onWakeLockToggle } from './settings.js';
 import { initCalibration, openCalibration, closeCalibration, startCalibrationRecord, stopCalibrationRecord, restartCalibrationRecord, applyCalibration } from './calibration.js';
 import { initExtInput, openExtInputModal, closeExtInputModal, retryExtInput, saveExtInput } from './extInput.js';
 import { zoomRecordIn, zoomRecordOut, seekToStart } from './record.js';
+import { initInstall, refreshInstallBtn } from './install.js';
 
 // ---- Tab management ----
 let _currentTab = 'tuner';
@@ -174,6 +175,9 @@ function init() {
   // Wake Lock
   initWakeLock();
 
+  // PWA インストールボタン
+  initInstall();
+
   // Range pickers（全タブ）
   buildAllRangePickers();
 
@@ -192,7 +196,7 @@ function exposeGlobals() {
   g.toggleRefPitch = toggleRefPitch;
   g.stepRefPitch = stepRefPitch;
   g.toggleSoundBack = toggleSoundBack;
-  g.setLang = (lang) => { setLang(lang); applyI18n(); refreshSettingsUI(); };
+  g.setLang = (lang) => { setLang(lang); applyI18n(); refreshSettingsUI(); refreshInstallBtn(); };
 
   // Settings tab
   g.onFamilyChange = onFamilyChange;
@@ -203,6 +207,7 @@ function exposeGlobals() {
   g.onDisplayTransChange = onDisplayTransChange;
   g.onMicDeviceChange = onMicDeviceChange;
   g.refreshMicDevices = refreshMicDevices;
+  g.onMicDeviceChangeTuner = onMicDeviceChangeTuner;
   g.toggleCard = toggleCard;
   g.openModal = openModal;
   g.onMinVolumeChange = onMinVolumeChange;
@@ -284,10 +289,16 @@ window.addEventListener('message', (event) => {
   if (!msg || typeof msg !== 'object') return;
 
   switch (msg.type) {
+    case 'setHostContext':
+      if (msg.host === 'namasoundplus') {
+        window.dispatchEvent(new CustomEvent('namachu:enter-hostcontext'));
+      }
+      break;
     case 'setLanguage':
       setLang(msg.lang);
       applyI18n();
       refreshSettingsUI();
+      refreshInstallBtn();
       break;
     case 'setWakeLock': {
       const toggle = document.getElementById('wakeLockToggle');

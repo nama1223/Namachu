@@ -79,6 +79,13 @@
       </div>
     </div>
 
+    <!-- 録音デバイス選択（マイクボタンのすぐ上） -->
+    <div class="mic-device-row">
+      <span class="mic-device-label" data-i18n="label_mic_input">マイク入力</span>
+      <select id="micDeviceSelectTuner" class="mic-device-select" onchange="onMicDeviceChangeTuner()"></select>
+      <button class="mic-device-refresh" onclick="refreshMicDevices()" data-i18n="label_mic_refresh">更新</button>
+    </div>
+
     <!-- 基準音 + マイク/全面色コントロール -->
     <div class="tuner-control-bar">
       <div class="ref-pitch-left">
@@ -417,6 +424,17 @@
       </div>
     </div>
 
+    <!-- アプリのインストール -->
+    <div class="setting-card" id="card-install">
+      <div class="setting-card-header" onclick="toggleCard('card-install')">
+        <span class="setting-card-title" data-i18n="label_install">アプリのインストール</span>
+        <span class="card-arrow">▼</span>
+      </div>
+      <div class="setting-card-body">
+        <button class="install-btn" id="installAppBtn" type="button">📲 アプリとしてインストール</button>
+      </div>
+    </div>
+
   </div>
 
 </div><!-- /.container -->
@@ -475,6 +493,29 @@
     <p data-i18n="help_scale_body">楽器固有の音程の癖を記録します。各音を3回吹くと平均値を記録します。吹き始めと吹き終わりは除外されます。好きな音から好きな順序で測定できます。</p>
     <div class="modal-buttons">
       <button onclick="closeModal('scaleHelpModal')" data-i18n="btn_close">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== インストール案内モーダル ===== -->
+<div class="modal-overlay" id="installInfoModal" onclick="if(event.target===this)closeModal('installInfoModal')">
+  <div class="modal-content">
+    <h2 id="installInfoTitle"></h2>
+    <div class="install-modal-body" id="installInfoBody"></div>
+    <div class="modal-buttons">
+      <button onclick="closeModal('installInfoModal')" data-i18n="btn_close">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== インストール確認モーダル（NamaSound+経由時） ===== -->
+<div class="modal-overlay" id="installGateModal" onclick="if(event.target===this)closeModal('installGateModal')">
+  <div class="modal-content">
+    <h2 id="installGateTitle"></h2>
+    <div class="install-modal-body" id="installGateBody"></div>
+    <div class="modal-buttons">
+      <button onclick="closeModal('installGateModal')" data-i18n="btn_cancel">キャンセル</button>
+      <button id="installGateProceedBtn" class="install-proceed-btn">NamaChuだけインストール</button>
     </div>
   </div>
 </div>
