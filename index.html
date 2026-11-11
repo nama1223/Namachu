@@ -72,18 +72,19 @@
       </div>
 
       <div class="note-display">
-        <div class="note-name" id="noteName">--</div>
-        <div class="note-octave" id="noteOctave"></div>
-        <div class="note-cents" id="noteCents">±0 ¢</div>
-        <div class="note-freq" id="noteFreq">-- Hz</div>
+        <div class="note-main">
+          <div class="note-name" id="noteName">--</div>
+          <div class="note-octave" id="noteOctave"></div>
+          <div class="note-cents" id="noteCents">±0 ¢</div>
+          <div class="note-freq" id="noteFreq">-- Hz</div>
+        </div>
+        <!-- 録音デバイス選択（音名表示の右横の空きスペースに配置し、縦幅を増やさない） -->
+        <div class="mic-device-side">
+          <span class="mic-device-label" data-i18n="label_mic_input">マイク入力</span>
+          <select id="micDeviceSelectTuner" class="mic-device-select" onchange="onMicDeviceChangeTuner()"></select>
+          <button class="mic-device-refresh" onclick="refreshMicDevices()" data-i18n="label_mic_refresh">更新</button>
+        </div>
       </div>
-    </div>
-
-    <!-- 録音デバイス選択（マイクボタンのすぐ上） -->
-    <div class="mic-device-row">
-      <span class="mic-device-label" data-i18n="label_mic_input">マイク入力</span>
-      <select id="micDeviceSelectTuner" class="mic-device-select" onchange="onMicDeviceChangeTuner()"></select>
-      <button class="mic-device-refresh" onclick="refreshMicDevices()" data-i18n="label_mic_refresh">更新</button>
     </div>
 
     <!-- 基準音 + マイク/全面色コントロール -->
